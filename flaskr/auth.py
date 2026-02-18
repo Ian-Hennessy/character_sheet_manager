@@ -48,7 +48,7 @@ def register():
             
         flash(error)
 
-    return render_template("auth/regiser.html")
+    return render_template("auth/register.html")
 
 @bp.route("/login", methods=('POST','GET'))
 def login():
