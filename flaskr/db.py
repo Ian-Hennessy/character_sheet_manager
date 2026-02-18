@@ -15,7 +15,7 @@ def get_db():
 
     return g.db
 
-def close_db():
+def close_db(e=None):
     db = g.pop('db',None)
     if db is not None:
         db.close()
@@ -38,10 +38,9 @@ sqlite3.register_converter(
 def init_app(app):
     # Tells Flask to run the close_db command
     # after returning response from server
-    app.teardown_appcontest(close_db)
+    app.teardown_appcontext(close_db)
 
     # reveals the init-db command to the app 
     # it can be run by the client 
     app.cli.add_command(init_db_command)
 
-    

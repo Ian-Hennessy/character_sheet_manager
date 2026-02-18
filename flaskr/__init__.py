@@ -2,7 +2,7 @@ import os
 
 from flask import Flask
 
-from db import init_app
+from . import db
 def create_app(test_config=None):
     # create and configure app 
     app = Flask(__name__, instance_relative_config=True)
@@ -25,5 +25,5 @@ def create_app(test_config=None):
     def hello():
         return 'Hello, World!'
     
-    init_app(app)
+    db.init_app(app)
     return app
