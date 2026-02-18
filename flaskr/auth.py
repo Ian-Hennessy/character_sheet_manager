@@ -79,6 +79,15 @@ def login():
             error = 'Password is incorrect! Please try again.'
        
         if error is None: 
+            """
+            session is a dict that stores data across requests. 
+            When validation succeeds, the user’s id is stored 
+            in a new session. The data is stored in a cookie
+            that is sent to the browser, and the browser 
+            then sends it back with subsequent requests. 
+            Flask securely signs the data so that it can’t be 
+            tampered with.
+            """
             session.clear()
 
             session['user_id'] = user['id']
@@ -87,6 +96,35 @@ def login():
         
         flash(error)
     return render_template('auth/login.html')
+
+@bp.before_app_request
+def load_logged_in_user():
+    user_id = session.get('user_id')
+
+    if user_id is None:
+        g.user = None
+    else:
+        g.user = get_db().execute(
+            'SELECT * FROM user WHERE id = ?', (user_id,)
+        ).fetchone()
+
+
+@bp.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('index'))
+
+def login_required(view):
+    @functools.wraps(view)
+    def wrapped_view(**kwargs):
+        if g.user is None:
+            # If user isn't logged in, kicks back to login screen
+            return redirect(url_for('auth/login'))
+        
+        return view(**kwargs)
+    
+    return wrapped_view
+
 
 
         
