@@ -1,3 +1,8 @@
+"""
+Handles various Database tasks via sqlite. 
+Manages creating, clearing, closing and updating db.
+"""
+
 import sqlite3
 from datetime import datetime 
 
