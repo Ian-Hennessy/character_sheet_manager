@@ -52,4 +52,41 @@ def register():
 
 @bp.route("/login", methods=('POST','GET'))
 def login():
-    if request_meth
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        db = get_db()
+
+        error = None 
+
+        user = db.execute(
+            # SQL: 
+            # SELECT * FROM : Choose item * from column user 
+            # WHERE username = ? -> choose item 
+            # where username input == username column
+            'SELECT * FROM user WHERE username = ?',
+            (username,)
+            ).fetchone() # fetchone: only return 
+                         # single instance of username
+                         # Shouldn't technically 
+                         # be necessary (only one username allowed)
+                         # but important if edge case slip occurs
+
+        if user is None:
+            error = 'Incorrect username.'
+        elif not check_password_hash(user['password'], password):
+            error = 'Password is incorrect! Please try again.'
+       
+        if error is None: 
+            session.clear()
+
+            session['user_id'] = user['id']
+
+            return redirect(url_for('index'))
+        
+        flash(error)
+    return render_template('auth/login.html')
+
+
+        
