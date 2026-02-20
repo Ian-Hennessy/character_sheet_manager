@@ -16,3 +16,14 @@ CREATE TABLE post (
     FOREIGN KEY (author_id) REFERENCES user (id)
 );
 
+-- Characters table: one row per character, belongs to a user
+CREATE TABLE IF NOT EXISTS characters (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    data TEXT NOT NULL, -- JSON-encoded character data
+    created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES user (id)
+);
+
