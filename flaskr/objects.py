@@ -19,7 +19,13 @@ Rarities:
 6 other/unknown
 """
 class Item:
-    def __init__(self, name: str = "Unknown Item", description: str = "No description", item_type: str = "Miscellaneous", rarity: int = 0):
+    def __init__(self, name: str = "Unknown Item", 
+                 description: str = "No description", 
+                 item_type: str = "Miscellaneous", 
+                 rarity: int = 0,
+                 # if the item adds special abilities or actions, incorporate as 
+                 # a list of "features" objects. Same implementation as adding a class feature 
+                 features: list = None):
         self._name = name
         self._description = description
         self._item_type = item_type
@@ -49,7 +55,9 @@ class Item:
         self._item_type = item_type
     
     def set_item_rarity(self, rarity: int):
-        if 
+        if rarity < 0 or rarity > 6:
+            return
+        self._rarity = rarity
 
     # Edit functionality
     def edit_item(self, name: str = None, description: str = None, item_type: str = None):

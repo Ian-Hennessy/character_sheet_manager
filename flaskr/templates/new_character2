@@ -1,0 +1,33 @@
+<!-- templates/new_character2.html - Class & Species Selection -->
+{% extends 'base.html' %}
+{% block content %}
+<form method="post" action="{{ url_for('character.create_step2') }}">
+    <h2>Step 2: Class & Species</h2>
+    
+    <!-- Initial Class and Level selection-->
+     <!-- TODO: multiclass support in character initialization? -->
+    <label for="class">Select Class:</label>
+    <select name="class" id="class" required>
+        <option value="">--Choose a Class--</option>
+        {% for class_name in available_classes %}
+        <option value="{{ class_name }}">{{ class_name }}</option>
+        {% endfor %}
+    </select>
+    <label for="level">Select Starting Level:</label>
+        <option value="">--Level--</option>
+        {% for i in range(20)}
+        <option value="{{ i }}">{{ i }}</option>
+        {% endfor %}
+    </select>
+    
+    <label for="species">Select Species:</label>
+    <select name="species" id="species" required>
+        <option value="">--Choose a Species--</option>
+        {% for species_name in available_species %}
+        <option value="{{ species_name }}">{{ species_name }}</option>
+        {% endfor %}
+    </select>
+    
+    <input type="submit" value="Create Character">
+</form>
+{% endblock %}
