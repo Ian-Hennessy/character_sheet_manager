@@ -1,0 +1,309 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ character.name }} - Features & Feats{% endblock %}
+
+{% block header %}
+  <h1>{{ character.name }} - Features & Feats</h1>
+  <p>Manage class features and feats</p>
+{% endblock %}
+
+{% block content %}
+<div class="features-container">
+  <div class="features-header">
+    <a href="{{ url_for('character.view', character_id=character_id) }}" class="btn btn-secondary">
+      ← Back to Character Sheet
+    </a>
+  </div>
+
+  <!-- Feats Section -->
+  <div class="feats-section">
+    <h2>Feats</h2>
+
+    <!-- Add Feat Form -->
+    <div class="add-feat-form">
+      <h3>Add Feat</h3>
+      <form id="feat-form" method="POST" action="{{ url_for('character.add_feat', character_id=character_id) }}">
+        <div class="form-group">
+          <label for="feat_name">Feat Name</label>
+          <input 
+            type="text" 
+            id="feat_name" 
+            name="feat_name" 
+            required 
+            maxlength="100"
+            placeholder="e.g., Great Weapon Master"
+          >
+        </div>
+
+        <div class="form-group">
+          <label for="feat_description">Description</label>
+          <textarea 
+            id="feat_description" 
+            name="feat_description" 
+            rows="3"
+            maxlength="500"
+            placeholder="Brief description of the feat"
+          ></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Add Feat</button>
+      </form>
+    </div>
+
+    <!-- Feats List -->
+    {% if feats %}
+      <div class="feats-list">
+        <h3>Your Feats</h3>
+        {% for feat in feats %}
+          <div class="feat-item" data-feat-index="{{ loop.index0 }}">
+            <div class="feat-content">
+              <h4>{{ feat.name }}</h4>
+              {% if feat.description %}
+                <p>{{ feat.description }}</p>
+              {% endif %}
+            </div>
+            <button 
+              class="btn btn-danger btn-sm" 
+              onclick="removeFeat('{{ character_id }}', '{{ loop.index0 }}')"
+            >
+              Remove
+            </button>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="empty-message">No feats added yet.</p>
+    {% endif %}
+  </div>
+
+  <!-- Features Section -->
+  <div class="features-section">
+    <h2>Class Features</h2>
+    <p>Class features are automatically granted based on your class and level.</p>
+    {% if character.features %}
+      <div class="features-list">
+        {% for feature in character.features %}
+          <div class="feature-item">
+            <h4>{{ feature.name }}</h4>
+            {% if feature.description %}
+              <p>{{ feature.description }}</p>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="empty-message">No features available for this level.</p>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+  // Handle feat form submission
+  document.getElementById('feat-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const formData = new FormData(this);
+    
+    fetch(`/character/{{ character_id }}/feats/add`, {
+      method: 'POST',
+      body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        alert(`Feat '${data.feat}' added!`);
+        location.reload();
+      } else {
+        alert(data.error || 'Error adding feat');
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alert('Error adding feat');
+    });
+  });
+
+  // Remove feat
+  function removeFeat(characterId, featIndex) {
+    if (confirm('Remove this feat?')) {
+      fetch(`/character/${characterId}/feats/${featIndex}/remove`, {
+        method: 'POST'
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          alert(`Feat '${data.removed}' removed!`);
+          location.reload();
+        } else {
+          alert(data.error || 'Error removing feat');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Error removing feat');
+      });
+    }
+  }
+</script>
+
+<style>
+  .features-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+
+  .features-header {
+    margin-bottom: 2rem;
+  }
+
+  .feats-section,
+  .features-section {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+  }
+
+  .feats-section h2,
+  .features-section h2 {
+    margin-top: 0;
+    color: #333;
+  }
+
+  .add-feat-form {
+    background: #f9f9f9;
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+  }
+
+  .add-feat-form h3 {
+    margin-top: 0;
+    color: #333;
+  }
+
+  .form-group {
+    margin-bottom: 1rem;
+  }
+
+  .form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #333;
+  }
+
+  .form-group input,
+  .form-group textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-family: inherit;
+    box-sizing: border-box;
+  }
+
+  .form-group input:focus,
+  .form-group textarea:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  }
+
+  .feats-list,
+  .features-list {
+    margin-top: 1.5rem;
+  }
+
+  .feats-list h3,
+  .features-list h3 {
+    margin-top: 0;
+    color: #333;
+  }
+
+  .feat-item,
+  .feature-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 1rem;
+    background: #f9f9f9;
+    border-left: 4px solid #667eea;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+  }
+
+  .feat-content,
+  .feature-item {
+    flex: 1;
+  }
+
+  .feat-item h4,
+  .feature-item h4 {
+    margin: 0 0 0.5rem 0;
+    color: #333;
+  }
+
+  .feat-item p,
+  .feature-item p {
+    margin: 0;
+    color: #666;
+    font-size: 0.95rem;
+  }
+
+  .empty-message {
+    color: #999;
+    font-style: italic;
+    text-align: center;
+    padding: 2rem;
+  }
+
+  .btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    font-weight: 500;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.2s;
+    text-decoration: none;
+    display: inline-block;
+  }
+
+  .btn-primary {
+    background: #667eea;
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: #5568d3;
+  }
+
+  .btn-secondary {
+    background: #e0e0e0;
+    color: #333;
+  }
+
+  .btn-secondary:hover {
+    background: #d0d0d0;
+  }
+
+  .btn-danger {
+    background: #ff6b6b;
+    color: white;
+  }
+
+  .btn-danger:hover {
+    background: #ff5252;
+  }
+
+  .btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    white-space: nowrap;
+  }
+</style>
+{% endblock %}

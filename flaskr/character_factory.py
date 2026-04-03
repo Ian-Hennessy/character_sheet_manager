@@ -12,13 +12,14 @@ from typing import Dict, Any, List, Optional
 from flaskr.character import Character, SKILL_ABILITY_MAP
 from flaskr.data.base_classes import DndClass
 from flaskr.data.base_species import DndSpecies, ABILITY_ORDER
-from content_registry import ContentRegistry
+from .content_registry import ContentRegistry
 
 def create_character(
     name: str,
     class_name: str,
     species_name: str,
     ability_scores: Optional[List[int]] = None,
+    level: int = 1
 ) -> Character:
     """
     Create a new D&D 5e character with proper initialization.
@@ -50,7 +51,7 @@ def create_character(
         "name": name,
         "class": class_name,
         "species": species_name,
-        "level": 1,
+        "level": level,
         "experience": 0,
         
         # Abilities

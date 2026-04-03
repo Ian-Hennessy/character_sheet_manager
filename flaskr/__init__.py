@@ -4,6 +4,7 @@ from flask import Flask, render_template
 
 from . import db
 from . import auth
+from . import  routes
 def create_app(test_config=None):
     # create and configure app 
     app = Flask(__name__, instance_relative_config=True)
@@ -20,7 +21,9 @@ def create_app(test_config=None):
 
         # ensure the instance folder exists
     os.makedirs(app.instance_path, exist_ok=True)
-
+    db.init_app(app)
+    from .routes import character
+    app.register_blueprint(character.bp)
     # a simple page that says hello
     @app.route('/hello')
     def hello():

@@ -1,0 +1,352 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ character.name }} - Character Sheet{% endblock %}
+
+{% block header %}
+  <div class="character-header">
+    <div>
+      <h1>{{ character.name }}</h1>
+      <p>{{ character.class }} - Level {{ character.level }} {{ character.species }}</p>
+    </div>
+    <div class="header-actions">
+      <a href="{{ url_for('character.home') }}" class="btn btn-secondary">Back to Characters</a>
+    </div>
+  </div>
+{% endblock %}
+
+{% block content %}
+<div class="character-sheet-container">
+  <!-- Main Stats -->
+  <div class="stats-section">
+    <div class="stat-card hp-card">
+      <h3>Hit Points</h3>
+      <div class="hp-display">
+        <div class="hp-value">{{ character.hit_points }}</div>
+        <div class="hp-max">/ {{ character.max_hit_points }}</div>
+      </div>
+      <div class="hp-bar">
+        <span class="hp-fill" style="width: {{ (character.hit_points / character.max_hit_points * 100 if character.max_hit_points > 0 else 0)|int }}"></span>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <h3>Armor Class</h3>
+      <div class="big-number">{{ character.armor_class }}</div>
+    </div>
+
+    <div class="stat-card">
+      <h3>Proficiency Bonus</h3>
+      <div class="big-number">+{{ character.proficiency_bonus }}</div>
+    </div>
+
+    <div class="stat-card">
+      <h3>Initiative</h3>
+      <div class="big-number">{% set dex_idx = 1 %}{{ character.modifiers[dex_idx] }}</div>
+    </div>
+  </div>
+
+  <!-- Ability Scores -->
+  <div class="abilities-section">
+    <h2>Ability Scores</h2>
+    <div class="abilities-grid">
+      {% for ability in abilities %}
+        <div class="ability-card">
+          <div class="ability-name">{{ ability.name }}</div>
+          <div class="ability-score">{{ ability.score }}</div>
+          <div class="ability-modifier">{{ ability.sign }}{{ ability.modifier }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Skills -->
+  <div class="skills-section">
+    <h2>Skills</h2>
+    <div class="skills-grid">
+      {% for skill in skills %}
+        <div class="skill-item {% if skill.proficient %}proficient{% endif %}">
+          <span class="skill-name">{{ skill.name }}</span>
+          <span class="skill-modifier">{{ skill.sign }}{{ skill.modifier }}</span>
+          {% if skill.proficient %}
+            <span class="proficiency-marker">✓</span>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Character Actions -->
+  <div class="character-actions">
+    <h2>Character Management</h2>
+    <div class="action-buttons">
+      {% if character.level < 20 %}
+        <button class="btn btn-primary" onclick="levelUp({{ character_id }})">
+          Level Up (→ Level {{ character.level + 1 }})
+        </button>
+      {% else %}
+        <button class="btn btn-secondary" disabled>Max Level (20)</button>
+      {% endif %}
+
+      <a href="{{ url_for('character.view_features', character_id=character_id) }}" class="btn btn-secondary">
+        View Features & Feats
+      </a>
+
+      <a href="{{ url_for('character.delete_confirm', character_id=character_id) }}" class="btn btn-danger">
+        Delete Character
+      </a>
+    </div>
+  </div>
+</div>
+
+<script>
+  function levelUp(characterId) {
+    if (confirm('Level up this character?')) {
+      fetch(`/character/${characterId}/levelup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          alert(`Leveled up to Level ${data.level}!`);
+          location.reload();
+        } else {
+          alert(data.error || 'Error leveling up');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Error leveling up character');
+      });
+    }
+  }
+</script>
+
+<style>
+  .character-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    gap: 2rem;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 1rem;
+  }
+
+  .character-sheet-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+
+  .stats-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 3rem;
+  }
+
+  .stat-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .stat-card h3 {
+    margin: 0 0 1rem 0;
+    color: #666;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .big-number {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #667eea;
+  }
+
+  .hp-card .hp-display {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+  }
+
+  .hp-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #667eea;
+  }
+
+  .hp-max {
+    font-size: 1rem;
+    color: #999;
+  }
+
+  .hp-bar {
+    display: block;
+    width: 100%;
+    height: 24px;
+    background: #e0e0e0;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .hp-fill {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, #4caf50, #8bc34a);
+    transition: width 0.3s;
+  }
+
+  .abilities-section,
+  .skills-section,
+  .character-actions {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+  }
+
+  .abilities-section h2,
+  .skills-section h2,
+  .character-actions h2 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    color: #333;
+  }
+
+  .abilities-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1rem;
+  }
+
+  .ability-card {
+    text-align: center;
+    padding: 1rem;
+    background: #f5f5f5;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    transition: all 0.2s;
+  }
+
+  .ability-card:hover {
+    background: #e8e8ff;
+    border-color: #667eea;
+  }
+
+  .ability-name {
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 0.5rem;
+  }
+
+  .ability-score {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #667eea;
+    margin-bottom: 0.25rem;
+  }
+
+  .ability-modifier {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: #333;
+  }
+
+  .skills-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+  }
+
+  .skill-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+
+  .skill-item.proficient {
+    background: #e8f5e9;
+    border-color: #4caf50;
+  }
+
+  .skill-name {
+    font-weight: 500;
+    flex: 1;
+  }
+
+  .skill-modifier {
+    font-weight: bold;
+    color: #667eea;
+    margin: 0 0.5rem;
+  }
+
+  .proficiency-marker {
+    color: #4caf50;
+    font-weight: bold;
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    font-weight: 500;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.2s;
+    text-decoration: none;
+    display: inline-block;
+  }
+
+  .btn-primary {
+    background: #667eea;
+    color: white;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: #5568d3;
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-secondary {
+    background: #e0e0e0;
+    color: #333;
+  }
+
+  .btn-secondary:hover {
+    background: #d0d0d0;
+  }
+
+  .btn-danger {
+    background: #ff6b6b;
+    color: white;
+  }
+
+  .btn-danger:hover {
+    background: #ff5252;
+  }
+</style>
+{% endblock %}

@@ -1,31 +1,138 @@
-
 {% extends 'base.html' %}
-
 {% block title %}D&D Character Sheet Manager{% endblock %}
 
 {% block header %}
   <h1>D&D Character Sheet Manager</h1>
-  <a class="action" href="/new_character">+ Create a new character</a>
+  {% if g.user %}
+    <p>Welcome back, {{ g.user['username'] }}!</p>
+  {% else %}
+    <p>Create and manage your D&D 5e characters</p>
+  {% endif %}
 {% endblock %}
 
 {% block content %}
-  <div class="two-up">
-    <div class="section">
-      <h2>Edit existing characters:</h2>
-      <ul class="item-list">
-        <li><a href="#">Character 1</a></li>
-        <li><a href="#">Character 2</a></li>
-        <li><a href="#">Character 3</a></li>
-      </ul>
+  {% if g.user %}
+    <!-- Logged in user - redirect to character home -->
+    <script>
+      window.location.href = "{{ url_for('character.home') }}";
+    </script>
+    <p>Redirecting to your characters...</p>
+  {% else %}
+    <!-- Not logged in - show welcome screen -->
+    <div class="landing-page">
+      <div class="welcome-section">
+        <h2>Welcome to the D&D 5e Character Sheet Manager</h2>
+        <p>Build, customize, and manage your D&D 5e characters with ease.</p>
+        
+        <div class="cta-buttons">
+          <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-lg">
+            Create Account
+          </a>
+          <a href="{{ url_for('auth.login') }}" class="btn btn-secondary btn-lg">
+            Log In
+          </a>
+        </div>
+      </div>
+
+      <div class="features-section">
+        <h3>Features</h3>
+        <ul class="features-list">
+          <li> Create and manage multiple characters</li>
+          <li> Customize ability scores and skills</li>
+          <li> Track feats and class features</li>
+          <li> View detailed character sheets</li>
+          <li> Level up your characters</li>
+        </ul>
+      </div>
     </div>
 
-    <div class="section">
-      <h2>Browse character options:</h2>
-      <ul class="item-list">
-        <li><a href="#">Classes</a></li>
-        <li><a href="#">Species</a></li>
-        <li><a href="#">Backgrounds</a></li>
-      </ul>
-    </div>
-  </div>
+    <style>
+      .landing-page {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 2rem;
+      }
+
+      .welcome-section {
+        text-align: center;
+        margin-bottom: 3rem;
+      }
+
+      .welcome-section h2 {
+        font-size: 2.5rem;
+        color: #333;
+        margin-bottom: 1rem;
+      }
+
+      .welcome-section p {
+        font-size: 1.1rem;
+        color: #666;
+        margin-bottom: 2rem;
+      }
+
+      .cta-buttons {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      .features-section {
+        background: white;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .features-section h3 {
+        margin-top: 0;
+        color: #333;
+      }
+
+      .features-list {
+        list-style: none;
+        padding: 0;
+      }
+
+      .features-list li {
+        padding: 0.75rem 0;
+        color: #666;
+        font-size: 1rem;
+      }
+
+      .btn-lg {
+        padding: 1rem 2rem;
+        font-size: 1.1rem;
+      }
+
+      .btn {
+        display: inline-block;
+        padding: 0.75rem 1.5rem;
+        text-decoration: none;
+        border-radius: 4px;
+        font-weight: 500;
+        cursor: pointer;
+        border: none;
+        transition: all 0.2s;
+      }
+
+      .btn-primary {
+        background: #667eea;
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background: #5568d3;
+      }
+
+      .btn-secondary {
+        background: #e0e0e0;
+        color: #333;
+      }
+
+      .btn-secondary:hover {
+        background: #d0d0d0;
+      }
+    </style>
+  {% endif %}
 {% endblock %}

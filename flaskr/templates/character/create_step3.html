@@ -1,0 +1,205 @@
+{% extends 'base.html' %}
+
+{% block title %}Create Character - Step 3{% endblock %}
+
+{% block header %}
+  <h1>Create New Character</h1>
+  <p>Step 3 of 3: Ability Scores</p>
+{% endblock %}
+
+{% block content %}
+<div class="create-character-container">
+  <form method="POST" action="{{ url_for('character.create_step3') }}" class="character-form">
+    <div class="form-section">
+      <h2>Ability Scores</h2>
+      <p>Set your character's base ability scores, or use the defaults (10 for each).</p>
+
+      <div class="use-defaults-group">
+        <label>
+          <input type="checkbox" name="use_defaults" id="use_defaults">
+          <span>Use default ability scores (10 for all abilities)</span>
+        </label>
+      </div>
+
+      <div class="abilities-grid" id="abilities-grid" style="display: none;">
+        <div class="ability-input">
+          <label for="ability_0">Strength</label>
+          <input type="number" id="ability_0" name="ability_0" min="3" max="18" value="10">
+        </div>
+        <div class="ability-input">
+          <label for="ability_1">Dexterity</label>
+          <input type="number" id="ability_1" name="ability_1" min="3" max="18" value="10">
+        </div>
+        <div class="ability-input">
+          <label for="ability_2">Constitution</label>
+          <input type="number" id="ability_2" name="ability_2" min="3" max="18" value="10">
+        </div>
+        <div class="ability-input">
+          <label for="ability_3">Intelligence</label>
+          <input type="number" id="ability_3" name="ability_3" min="3" max="18" value="10">
+        </div>
+        <div class="ability-input">
+          <label for="ability_4">Wisdom</label>
+          <input type="number" id="ability_4" name="ability_4" min="3" max="18" value="10">
+        </div>
+        <div class="ability-input">
+          <label for="ability_5">Charisma</label>
+          <input type="number" id="ability_5" name="ability_5" min="3" max="18" value="10">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <a href="{{ url_for('character.create_step2') }}" class="btn btn-secondary">← Back</a>
+      <button type="submit" class="btn btn-primary">Create Character</button>
+    </div>
+  </form>
+</div>
+
+<script>
+  const useDefaultsCheckbox = document.getElementById('use_defaults');
+  const abilitiesGrid = document.getElementById('abilities-grid');
+
+  // Toggle ability inputs
+  useDefaultsCheckbox.addEventListener('change', function() {
+    if (this.checked) {
+      abilitiesGrid.style.display = 'none';
+    } else {
+      abilitiesGrid.style.display = 'grid';
+    }
+  });
+
+  // Validate ability scores on submit
+  document.querySelector('form').addEventListener('submit', function(e) {
+    if (!useDefaultsCheckbox.checked) {
+      const inputs = abilitiesGrid.querySelectorAll('input[type="number"]');
+      for (let input of inputs) {
+        const value = parseInt(input.value);
+        if (isNaN(value) || value < 3 || value > 18) {
+          e.preventDefault();
+          alert('All ability scores must be between 3 and 18');
+          return;
+        }
+      }
+    }
+  });
+</script>
+
+<style>
+  .create-character-container {
+    max-width: 600px;
+    margin: 2rem auto;
+    padding: 2rem;
+  }
+
+  .character-form {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    padding: 2rem;
+  }
+
+  .form-section {
+    margin-bottom: 2rem;
+  }
+
+  .form-section h2 {
+    margin-bottom: 0.5rem;
+    color: #333;
+  }
+
+  .form-section > p {
+    margin: 0 0 1.5rem 0;
+    color: #666;
+  }
+
+  .use-defaults-group {
+    margin-bottom: 1.5rem;
+  }
+
+  .use-defaults-group label {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  .use-defaults-group input[type="checkbox"] {
+    width: auto;
+    cursor: pointer;
+  }
+
+  .abilities-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .ability-input {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .ability-input label {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    color: #333;
+  }
+
+  .ability-input input {
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-family: inherit;
+    text-align: center;
+  }
+
+  .ability-input input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  }
+
+  .form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid #e0e0e0;
+  }
+
+  .btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    font-weight: 500;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.2s;
+    text-decoration: none;
+    display: inline-block;
+  }
+
+  .btn-primary {
+    background: #667eea;
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: #5568d3;
+  }
+
+  .btn-secondary {
+    background: #e0e0e0;
+    color: #333;
+  }
+
+  .btn-secondary:hover {
+    background: #d0d0d0;
+  }
+</style>
+{% endblock %}

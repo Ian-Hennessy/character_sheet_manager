@@ -28,18 +28,18 @@ class ContentRegistry:
         """Load from any source"""
         from flaskr.data.base_classes import DndClass
         from flaskr.db import get_db
-
+        db = get_db()
         # prioritize user's homebrew 
         # if user_id is input
         if user_id:
-            db = get_db()
+            
             homebrew = db.execute(
                 'SELECT data FROM homebrew_classes WHERE user_id = ? AND name = ?',
                 (user_id, class_name)
             ).fetchone()
 
             if homebrew: 
-                return json.loads(homebrew['data])'])
+                return DndClass.from_dict(json.loads(homebrew['data']))
 
         # fetch from shared homebrew if not user_id 
         shared = db.execute(
@@ -47,13 +47,13 @@ class ContentRegistry:
              (class_name,)
         ).fetchone()
         if shared:
-                return json.loads(homebrew['data'])
+                return DndClass.from_dict(json.loads(shared['data']))
         
         # default to official SRD if not homebrew
 
         try: 
             dnd_class = DndClass(class_name)
-            return dnd_class.to_character_dict()
+            return dnd_class
         except ValueError:
             raise ValueError(f"Class '{class_name}' was not found in any source."
                             + "Would you like to create it?")

@@ -1,0 +1,244 @@
+{% extends 'base.html' %}
+
+{% block title %}My Characters{% endblock %}
+
+{% block header %}
+  <h1>My Characters</h1>
+  <p>Manage and view your D&D 5e characters</p>
+{% endblock %}
+
+{% block content %}
+<div class="characters-container">
+  <!-- Create New Character Button -->
+  <div class="create-character-card">
+    <div class="create-character-content">
+      <h2>Create New Character</h2>
+      <p>Start your next adventure</p>
+      <a href="{{ url_for('character.create_step1') }}" class="btn btn-primary btn-lg">
+        + Create Character
+      </a>
+    </div>
+  </div>
+
+  <!-- Characters Grid -->
+  {% if characters %}
+    <div class="characters-grid">
+      {% for char in characters %}
+        <div class="character-card" data-character-id="{{ char.id }}">
+          <div class="character-card-header">
+            <h3>{{ char.name }}</h3>
+            <span class="character-level">Level {{ char.level }}</span>
+          </div>
+
+          <div class="character-card-body">
+            <div class="character-info">
+              <p><strong>Class:</strong> {{ char.class }}</p>
+              <p><strong>Species:</strong> {{ char.species }}</p>
+              <p><strong>AC:</strong> {{ char.ac }}</p>
+              <p>
+                <strong>HP:</strong> 
+                <span class="hp-bar">
+                  <span class="hp-fill" style="width: {{ (char.hp / char.max_hp * 100)|int }}%"></span>
+                </span>
+                {{ char.hp }} / {{ char.max_hp }}
+              </p>
+            </div>
+          </div>
+
+          <div class="character-card-actions">
+            <a href="{{ url_for('character.view', character_id=char.id) }}" class="btn btn-secondary">
+              View Sheet
+            </a>
+            <a href="{{ url_for('character.view_features', character_id=char.id) }}" class="btn btn-secondary">
+              Features
+            </a>
+            <a href="{{ url_for('character.delete_confirm', character_id=char.id) }}" class="btn btn-danger">
+              Delete
+            </a>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <p>You haven't created any characters yet.</p>
+      <a href="{{ url_for('character.create_step1') }}" class="btn btn-primary">
+        Create Your First Character
+      </a>
+    </div>
+  {% endif %}
+</div>
+
+<style>
+  .characters-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+
+  .create-character-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 3rem;
+    border-radius: 8px;
+    margin-bottom: 3rem;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+  }
+
+  .create-character-card h2 {
+    margin: 0 0 0.5rem 0;
+    font-size: 2rem;
+  }
+
+  .create-character-card p {
+    margin: 0.5rem 0 1.5rem 0;
+    opacity: 0.9;
+  }
+
+  .characters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-bottom: 2rem;
+  }
+
+  .character-card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .character-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  }
+
+  .character-card-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .character-card-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+  }
+
+  .character-level {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: bold;
+  }
+
+  .character-card-body {
+    padding: 1.5rem;
+  }
+
+  .character-info p {
+    margin: 0.5rem 0;
+    font-size: 0.95rem;
+  }
+
+  .character-info strong {
+    display: inline-block;
+    min-width: 80px;
+  }
+
+  .hp-bar {
+    display: inline-block;
+    width: 150px;
+    height: 20px;
+    background: #e0e0e0;
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 0 0.5rem;
+    vertical-align: middle;
+  }
+
+  .hp-fill {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, #4caf50, #8bc34a);
+    transition: width 0.3s;
+  }
+
+  .character-card-actions {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .character-card-actions .btn {
+    flex: 1;
+    min-width: 100px;
+    padding: 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 3rem 2rem;
+    background: #f5f5f5;
+    border-radius: 8px;
+    color: #666;
+  }
+
+  .empty-state p {
+    margin-bottom: 1.5rem;
+    font-size: 1.1rem;
+  }
+
+  .btn {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    text-decoration: none;
+    border-radius: 4px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+  }
+
+  .btn-primary {
+    background: #667eea;
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: #5568d3;
+  }
+
+  .btn-secondary {
+    background: #e0e0e0;
+    color: #333;
+  }
+
+  .btn-secondary:hover {
+    background: #d0d0d0;
+  }
+
+  .btn-danger {
+    background: #ff6b6b;
+    color: white;
+  }
+
+  .btn-danger:hover {
+    background: #ff5252;
+  }
+
+  .btn-lg {
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+  }
+</style>
+{% endblock %}
