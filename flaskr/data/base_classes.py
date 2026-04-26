@@ -23,13 +23,13 @@ PROFICIENCY_MAP = {
     "hand-crossbows": ("weapons", "hand-crossbow"),
     "greatswords": ("weapons", "greatsword"),
     
-    # Saving throws (maps proficiency to ability)
-    "saving-throws-dexterity": ("saving_throws", "dexterity"),
-    "saving-throws-constitution": ("saving_throws", "constitution"),
-    "saving-throws-intelligence": ("saving_throws", "intelligence"),
-    "saving-throws-wisdom": ("saving_throws", "wisdom"),
-    "saving-throws-charisma": ("saving_throws", "charisma"),
-    "saving-throws-strength": ("saving_throws", "strength"),
+    # Saving throws (API uses short form: saving-throw-dex)
+    "saving-throw-str": ("saving_throws", "strength"),
+    "saving-throw-dex": ("saving_throws", "dexterity"),
+    "saving-throw-con": ("saving_throws", "constitution"),
+    "saving-throw-int": ("saving_throws", "intelligence"),
+    "saving-throw-wis": ("saving_throws", "wisdom"),
+    "saving-throw-cha": ("saving_throws", "charisma"),
     
     # Skills (proficiency to skill name)
     "skill-acrobatics": ("skills", "acrobatics"),
@@ -151,34 +151,66 @@ class DndClass:
         
         return choices
     
-    def get_features_at_level(self, level: int) -> List[str]:
+    def get_saving_throws(self) -> List[str]:
+        """
+        Get saving throw proficiencies granted by this class.
+
+        Returns:
+            List of full ability names (e.g., ['dexterity', 'charisma'])
+        """
+        short_to_full = {
+            'str': 'strength', 'dex': 'dexterity', 'con': 'constitution',
+            'int': 'intelligence', 'wis': 'wisdom', 'cha': 'charisma'
+        }
+        return [
+            short_to_full[save['index']]
+            for save in self.api_data.get('saving_throws', [])
+            if save.get('index') in short_to_full
+        ]
+
+    def get_features_at_level(self, level: int) -> List[Dict[str, str]]:
         """
         Get features granted at a specific character level.
-        
+
         Args:
             level: Character level (1-20)
-        
+
         Returns:
-            List of feature names (e.g., ['Spellcasting', 'Channel Divinity'])
+            List of dicts with 'index' and 'name' keys
         """
+        data = get_cached_or_fetch(
+            'class_level', f'{self.index}_{level}',
+            f'classes/{self.index}/levels/{level}'
+        )
+        if not data:
+            return []
+
         features = []
-        
-        # Features are in the 'class_levels' endpoint, but for MVP
-        # we can use the 'features' array from the main class endpoint
-        # This would require a separate API call per level for full accuracy
-        
+        for f in data.get('features', []):
+            index = f.get('index', '')
+            name = f.get('name', '')
+            detail = get_cached_or_fetch('feature', index, f'features/{index}')
+            desc_parts = detail.get('desc', []) if detail else []
+            description = ' '.join(desc_parts) if desc_parts else ''
+            features.append({'index': index, 'name': name, 'description': description})
         return features
-    
+
     def get_spellcasting_ability(self) -> Optional[str]:
         """
         Get the spellcasting ability for this class if applicable.
-        
+
         Returns:
-            Ability name ('wisdom', 'intelligence', 'charisma') or None
+            Full ability name ('wisdom', 'intelligence', 'charisma') or None
         """
-        # Fetch from features - requires additional setup
-        # For now, return None (will be added with feature expansion)
-        return None
+        spellcasting = self.api_data.get('spellcasting')
+        if not spellcasting:
+            return None
+        short_to_full = {
+            'str': 'strength', 'dex': 'dexterity', 'con': 'constitution',
+            'int': 'intelligence', 'wis': 'wisdom', 'cha': 'charisma'
+        }
+        index = spellcasting.get('spellcasting_ability', {}).get('index', '')
+        return short_to_full.get(index)
     
     def to_character_dict(self) -> Dict[str, Any]:
         """

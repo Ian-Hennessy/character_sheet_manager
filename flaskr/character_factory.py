@@ -66,7 +66,9 @@ def create_character(
         "armor_class": 10,
         "initiative": 0,
         "speed": 30,
-        
+
+        # features
+        "features": dnd_class.get_features_at_level(level),
         # Proficiencies
         "proficiency_bonus": 2,
         "proficiencies": dnd_class.get_starting_proficiencies(),
@@ -128,7 +130,13 @@ def create_character(
     character_data["skills"] = _initialize_skills(character_data["ability_scores"])
     character_data["saving_throws"] = _initialize_saving_throws(character_data["ability_scores"])
     
-    return Character(character_data)
+    character = Character(character_data)
+
+    # Apply class saving throw proficiencies
+    for ability in dnd_class.get_saving_throws():
+        character.set_saving_throw_proficiency(ability, proficient=True)
+
+    return character
 
 
 def _calculate_modifiers(ability_scores: List[int]) -> List[int]:

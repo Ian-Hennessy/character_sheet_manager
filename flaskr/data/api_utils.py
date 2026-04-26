@@ -4,7 +4,7 @@ Implements local JSON caching to minimize API calls.
 """
 
 import json
-import urllib.request
+import requests
 from pathlib import Path
 from typing import Dict, Any, Optional
 
@@ -35,8 +35,9 @@ def fetch_from_api(endpoint: str) -> Optional[Dict[str, Any]]:
     """
     try:
         url = f"{API_BASE}/{endpoint}"
-        with urllib.request.urlopen(url, timeout=5) as response:
-            return json.loads(response.read().decode())
+        response = requests.get(url, timeout=5, headers={'Accept': 'application/json'})
+        response.raise_for_status()
+        return response.json()
     except Exception as e:
         print(f"⚠️  API Error fetching {endpoint}: {e}")
         return None

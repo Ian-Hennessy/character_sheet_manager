@@ -7,6 +7,8 @@ from flask import (
     Blueprint, render_template, request, redirect, url_for, session, 
     jsonify, flash, current_app
 )
+
+from .. import utils
 from werkzeug.exceptions import BadRequest, NotFound, Forbidden
 import json
 import logging
@@ -154,8 +156,8 @@ def create_step2():
         return redirect(url_for('character.create_step1'))
     
     try:
-        available_classes = DndClass.get_available_classes()
-        available_species = DndSpecies.get_available_species()
+        available_classes = utils._extract_index(utils._api_request('classes'), 'name')
+        available_species = utils._extract_index(utils._api_request('races'), 'name')
     except Exception as e:
         logger.error(f"Error fetching classes/species: {e}")
         flash('Error loading class/species data. Please try again.', 'error')
@@ -210,35 +212,57 @@ def create_step2():
     )
 
 
+_POINT_COSTS = {8:0, 9:1, 10:2, 11:3, 12:4, 13:5, 14:7, 15:9, 16:10, 17:11, 18:12, 19:13, 20:14}
+_STANDARD_ARRAY = sorted([15, 14, 13, 12, 10, 8])
+_VALID_PB_BUDGETS = {25, 27, 30}
+
+
 @bp.route('/create/step3', methods=['GET', 'POST'])
 @login_required
 def create_step3():
-
-
-    """Step 3: Ability scores (optional)."""
+    """Step 3: Ability scores — standard array, point buy, or manual."""
     if 'char_creation' not in session or 'class' not in session['char_creation']:
         return redirect(url_for('character.create_step1'))
+
     if request.method == 'POST':
-        # Get ability scores or use defaults
-        ability_scores = None
-        use_defaults = request.form.get('use_defaults') == 'on'
-        
-        if not use_defaults:
+        score_method = request.form.get('score_method', 'standard')
+
+        # Parse raw scores from hidden inputs populated by JS
+        try:
+            ability_scores = [int(request.form.get(f'ability_{i}', '10')) for i in range(6)]
+        except (ValueError, TypeError):
+            flash('Invalid ability score input.', 'error')
+            return render_template('character/create_step3.html', score_method=score_method)
+
+        # Per-method validation
+        if score_method == 'standard':
+            if sorted(ability_scores) != _STANDARD_ARRAY:
+                flash('Ability scores must use the standard array: 15, 14, 13, 12, 10, 8.', 'error')
+                return render_template('character/create_step3.html', score_method=score_method)
+
+        elif score_method == 'pointbuy':
             try:
-                ability_scores = [
-                    int(request.form.get(f'ability_{i}', '10'))
-                    for i in range(6)
-                ]
-                
-                # Validate range
-                for score in ability_scores:
-                    if score < 3 or score > 18:
-                        flash('All ability scores must be between 3 and 18', 'error')
-                        return render_template('character/create_step3.html')
+                budget = int(request.form.get('pb_budget', '27'))
+                if budget not in _VALID_PB_BUDGETS:
+                    raise ValueError
             except (ValueError, TypeError):
-                flash('Invalid ability score input', 'error')
-                return render_template('character/create_step3.html')
-        
+                flash('Invalid point buy budget.', 'error')
+                return render_template('character/create_step3.html', score_method=score_method)
+
+            if any(s < 8 or s > 20 for s in ability_scores):
+                flash('Point buy scores must each be between 8 and 20.', 'error')
+                return render_template('character/create_step3.html', score_method=score_method)
+
+            total_cost = sum(_POINT_COSTS.get(s, 999) for s in ability_scores)
+            if total_cost != budget:
+                flash(f'Point total ({total_cost}) does not match the selected budget ({budget}).', 'error')
+                return render_template('character/create_step3.html', score_method=score_method)
+
+        else:  # manual / rolled
+            if any(s < 3 or s > 20 for s in ability_scores):
+                flash('Manual ability scores must each be between 3 and 20.', 'error')
+                return render_template('character/create_step3.html', score_method=score_method)
+
         # Create character
         db = get_db()
         try:
@@ -251,10 +275,9 @@ def create_step3():
                 level=char_data.get('level', 1),
             )
 
-            # Save to database
             db.execute(
-                '''INSERT INTO characters 
-                   (user_id, name, class, species, level, data, created, updated) 
+                '''INSERT INTO characters
+                   (user_id, name, class, species, level, data, created, updated)
                    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)''',
                 (
                     session['user_id'],
@@ -262,24 +285,23 @@ def create_step3():
                     char_data['class'],
                     char_data['species'],
                     char_data.get('level', 1),
-                    json.dumps(character.data)
+                    json.dumps(character.data),
                 )
             )
             db.commit()
-            
-            # Clean up session
+
             del session['char_creation']
             session.modified = True
-            
+
             flash(f"Character '{character.data['name']}' created successfully!", 'success')
             return redirect(url_for('character.home'))
-        
+
         except Exception as e:
             logger.error(f"Error creating character: {e}")
             flash('Error creating character. Please try again.', 'error')
-            return render_template('character/create_step3.html')
-    
-    return render_template('character/create_step3.html')
+            return render_template('character/create_step3.html', score_method=score_method)
+
+    return render_template('character/create_step3.html', score_method='standard')
 
 
 # VIEW CHARACTER
@@ -386,10 +408,8 @@ def level_up(character_id):
         
         import random
         hp_gain = max(1, random.randint(1, hit_die) + con_mod)
-        data['hit_points'] = min(
-            data['max_hit_points'] + hp_gain,
-            data['max_hit_points']
-        )
+        data['max_hit_points'] += hp_gain
+        data['hit_points'] = data['max_hit_points']
         
         # Save changes
         db.execute(
@@ -402,7 +422,9 @@ def level_up(character_id):
             'success': True,
             'level': new_level,
             'hp': data['hit_points'],
-            'max_hp': data['max_hit_points']
+            'max_hp': data['max_hit_points'],
+            'hp_gained': hp_gain,
+            'proficiency_bonus': data['proficiency_bonus']
         })
     
     except (json.JSONDecodeError, KeyError) as e:

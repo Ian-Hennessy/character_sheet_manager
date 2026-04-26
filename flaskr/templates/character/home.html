@@ -26,7 +26,7 @@
       {% for char in characters %}
         <div class="character-card" data-character-id="{{ char.id }}">
           <div class="character-card-header">
-            <h3>{{ char.name }}</h3>
+          <h3>{{ char.name }}</h3>
             <span class="character-level">Level {{ char.level }}</span>
           </div>
 
@@ -83,6 +83,7 @@
     border-radius: 8px;
     margin-bottom: 3rem;
     text-align: center;
+    text-decoration-color: #FFFF;
     box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
   }
 
@@ -128,6 +129,7 @@
   .character-card-header h3 {
     margin: 0;
     font-size: 1.5rem;
+    text-decoration-color:#FFFF
   }
 
   .character-level {

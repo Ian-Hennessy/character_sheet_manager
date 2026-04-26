@@ -55,19 +55,23 @@
       <div class="feats-list">
         <h3>Your Feats</h3>
         {% for feat in feats %}
-          <div class="feat-item" data-feat-index="{{ loop.index0 }}">
-            <div class="feat-content">
-              <h4>{{ feat.name }}</h4>
+          <div class="accordion-item" data-feat-index="{{ loop.index0 }}">
+            <button class="accordion-header" onclick="toggleAccordion(this)" type="button">
+              <span class="accordion-title">{{ feat.name }}</span>
+              <span class="chevron">▾</span>
+            </button>
+            <div class="accordion-body">
               {% if feat.description %}
                 <p>{{ feat.description }}</p>
+              {% else %}
+                <p class="no-desc">No description provided.</p>
               {% endif %}
+              <button
+                class="btn btn-danger btn-sm"
+                onclick="removeFeat('{{ character_id }}', '{{ loop.index0 }}')"
+                type="button"
+              >Remove</button>
             </div>
-            <button 
-              class="btn btn-danger btn-sm" 
-              onclick="removeFeat('{{ character_id }}', '{{ loop.index0 }}')"
-            >
-              Remove
-            </button>
           </div>
         {% endfor %}
       </div>
@@ -80,14 +84,21 @@
   <div class="features-section">
     <h2>Class Features</h2>
     <p>Class features are automatically granted based on your class and level.</p>
-    {% if character.features %}
+    {% if features %}
       <div class="features-list">
-        {% for feature in character.features %}
-          <div class="feature-item">
-            <h4>{{ feature.name }}</h4>
-            {% if feature.description %}
-              <p>{{ feature.description }}</p>
-            {% endif %}
+        {% for feature in features %}
+          <div class="accordion-item">
+            <button class="accordion-header" onclick="toggleAccordion(this)" type="button">
+              <span class="accordion-title">{{ feature.name }}</span>
+              <span class="chevron">▾</span>
+            </button>
+            <div class="accordion-body">
+              {% if feature.description %}
+                <p>{{ feature.description }}</p>
+              {% else %}
+                <p class="no-desc">No description available.</p>
+              {% endif %}
+            </div>
           </div>
         {% endfor %}
       </div>
@@ -122,6 +133,14 @@
       alert('Error adding feat');
     });
   });
+
+  // Accordion toggle
+  function toggleAccordion(btn) {
+    const body = btn.nextElementSibling;
+    const isOpen = body.classList.contains('open');
+    body.classList.toggle('open', !isOpen);
+    btn.querySelector('.chevron').style.transform = isOpen ? '' : 'rotate(180deg)';
+  }
 
   // Remove feat
   function removeFeat(characterId, featIndex) {
@@ -218,41 +237,60 @@
     margin-top: 1.5rem;
   }
 
-  .feats-list h3,
-  .features-list h3 {
+  .feats-list h3 {
     margin-top: 0;
     color: #333;
   }
 
-  .feat-item,
-  .feature-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    padding: 1rem;
-    background: #f9f9f9;
+  /* ── Accordion ── */
+  .accordion-item {
     border-left: 4px solid #667eea;
     border-radius: 4px;
-    margin-bottom: 1rem;
+    margin-bottom: 0.625rem;
+    background: #f9f9f9;
+    overflow: hidden;
   }
 
-  .feat-content,
-  .feature-item {
-    flex: 1;
-  }
-
-  .feat-item h4,
-  .feature-item h4 {
-    margin: 0 0 0.5rem 0;
+  .accordion-header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.85rem 1rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
     color: #333;
+    text-align: left;
+    transition: background 0.12s;
   }
 
-  .feat-item p,
-  .feature-item p {
-    margin: 0;
-    color: #666;
-    font-size: 0.95rem;
+  .accordion-header:hover { background: #f0f0f8; }
+
+  .chevron {
+    font-size: 1rem;
+    color: #667eea;
+    transition: transform 0.2s;
+    flex-shrink: 0;
   }
+
+  .accordion-body {
+    display: none;
+    padding: 0 1rem 1rem;
+    color: #555;
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+
+  .accordion-body.open { display: block; }
+
+  .accordion-body p { margin: 0 0 0.75rem; }
+  .accordion-body p:last-of-type { margin-bottom: 0.75rem; }
+
+  .no-desc { color: #aaa; font-style: italic; }
 
   .empty-message {
     color: #999;

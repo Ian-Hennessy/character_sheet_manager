@@ -12,6 +12,9 @@ etc.
 """
 import json
 from typing import Dict, List, Optional, Any
+import requests
+
+url = "https://www.dnd5eapi.co/api/2014/"
 
 class ContentRegistry:
     """

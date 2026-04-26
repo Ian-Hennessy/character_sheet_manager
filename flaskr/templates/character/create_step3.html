@@ -8,148 +8,479 @@
 {% endblock %}
 
 {% block content %}
-<div class="create-character-container">
-  <form method="POST" action="{{ url_for('character.create_step3') }}" class="character-form">
-    <div class="form-section">
-      <h2>Ability Scores</h2>
-      <p>Set your character's base ability scores, or use the defaults (10 for each).</p>
+<div class="step3-container">
+  <form method="POST" action="{{ url_for('character.create_step3') }}" id="ability-form" novalidate>
 
-      <div class="use-defaults-group">
-        <label>
-          <input type="checkbox" name="use_defaults" id="use_defaults">
-          <span>Use default ability scores (10 for all abilities)</span>
-        </label>
+    {# Hidden inputs always submitted: JS populates on submit #}
+    <input type="hidden" name="score_method" id="score_method" value="{{ score_method or 'standard' }}">
+    <input type="hidden" name="pb_budget"    id="pb_budget_hidden" value="27">
+    {% for i in range(6) %}
+    <input type="hidden" name="ability_{{ i }}" id="h{{ i }}" value="10">
+    {% endfor %}
+
+    <div class="form-card">
+
+      {# ── Tab bar ── #}
+      <div class="method-tabs" role="tablist">
+        <button type="button" class="tab-btn{% if (score_method or 'standard') == 'standard' %} active{% endif %}"
+                data-tab="standard" role="tab" aria-selected="true">
+          Standard Array
+        </button>
+        <button type="button" class="tab-btn{% if score_method == 'pointbuy' %} active{% endif %}"
+                data-tab="pointbuy" role="tab">
+          Point Buy
+        </button>
+        <button type="button" class="tab-btn{% if score_method == 'manual' %} active{% endif %}"
+                data-tab="manual" role="tab">
+          Manual / Rolled
+        </button>
       </div>
 
-      <div class="abilities-grid" id="abilities-grid" style="display: none;">
-        <div class="ability-input">
-          <label for="ability_0">Strength</label>
-          <input type="number" id="ability_0" name="ability_0" min="3" max="18" value="10">
+      {% set ability_names = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'] %}
+
+      {# ═══════════════════════════════════════
+         STANDARD ARRAY
+         ═══════════════════════════════════════ #}
+      <div id="tab-standard"
+           class="tab-panel{% if (score_method or 'standard') == 'standard' %} active{% endif %}">
+        <p class="method-desc">
+          Assign <strong>15 · 14 · 13 · 12 · 10 · 8</strong> to your six abilities. Each value is only used once. 
+        </p>
+        <div class="abilities-grid">
+          {% for name in ability_names %}
+          <div class="ability-row">
+            <span class="ability-label">{{ name }}</span>
+            <select class="sa-select" data-idx="{{ loop.index0 }}">
+              <option value="">—</option>
+              <option value="15">15</option>
+              <option value="14">14</option>
+              <option value="13">13</option>
+              <option value="12">12</option>
+              <option value="10">10</option>
+              <option value="8">8</option>
+            </select>
+            <span class="modifier muted" id="sa_mod_{{ loop.index0 }}"></span>
+          </div>
+          {% endfor %}
         </div>
-        <div class="ability-input">
-          <label for="ability_1">Dexterity</label>
-          <input type="number" id="ability_1" name="ability_1" min="3" max="18" value="10">
+        <p id="sa-warning" class="warning hidden"></p>
+      </div>
+
+      {# ═══════════════════════════════════════
+         POINT BUY
+         ═══════════════════════════════════════ #}
+      <div id="tab-pointbuy"
+           class="tab-panel{% if score_method == 'pointbuy' %} active{% endif %}">
+        <div class="pb-header">
+          <div class="budget-row">
+            <label for="pb-budget" class="budget-label">Point Budget:</label>
+            <select id="pb-budget" class="budget-select">
+              <option value="25">25 points</option>
+              <option value="27" selected>27 points (PHB standard)</option>
+              <option value="30">30 points</option>
+            </select>
+          </div>
+          <div class="pb-remaining-display">
+            Remaining: <strong id="pb-remaining">27</strong>
+          </div>
         </div>
-        <div class="ability-input">
-          <label for="ability_2">Constitution</label>
-          <input type="number" id="ability_2" name="ability_2" min="3" max="18" value="10">
-        </div>
-        <div class="ability-input">
-          <label for="ability_3">Intelligence</label>
-          <input type="number" id="ability_3" name="ability_3" min="3" max="18" value="10">
-        </div>
-        <div class="ability-input">
-          <label for="ability_4">Wisdom</label>
-          <input type="number" id="ability_4" name="ability_4" min="3" max="18" value="10">
-        </div>
-        <div class="ability-input">
-          <label for="ability_5">Charisma</label>
-          <input type="number" id="ability_5" name="ability_5" min="3" max="18" value="10">
+        <p class="method-desc">
+          Scores range from 8-20. &nbsp;You can spend points to increase your scores for each ability.
+        </p>
+        <div class="abilities-grid">
+          {% for name in ability_names %}
+          <div class="ability-row">
+            <span class="ability-label">{{ name }}</span>
+            <div class="pb-control">
+              <button type="button" class="icon-btn pb-btn"
+                      data-idx="{{ loop.index0 }}" data-delta="-1">−</button>
+              <span class="pb-score" id="pb_score_{{ loop.index0 }}">8</span>
+              <button type="button" class="icon-btn pb-btn"
+                      data-idx="{{ loop.index0 }}" data-delta="1">+</button>
+            </div>
+            <span class="modifier" id="pb_mod_{{ loop.index0 }}">−1</span>
+            <span class="cost-badge">(<span id="pb_cost_{{ loop.index0 }}">0</span>&nbsp;pts)</span>
+          </div>
+          {% endfor %}
         </div>
       </div>
-    </div>
+
+      {# ═══════════════════════════════════════
+         MANUAL / ROLLED
+         ═══════════════════════════════════════ #}
+      <div id="tab-manual"
+           class="tab-panel{% if score_method == 'manual' %} active{% endif %}">
+        <p class="method-desc">
+          Enter rolled scores manually (3-20).
+        </p>
+        <button type="button" id="roll-all" class="btn btn-secondary roll-all-btn">
+          ↺ Roll All Stats
+        </button>
+        <div class="abilities-grid">
+          {% for name in ability_names %}
+          <div class="ability-row">
+            <span class="ability-label">{{ name }}</span>
+            <div class="manual-control">
+              <input type="number" id="man_{{ loop.index0 }}" class="man-input"
+                     data-idx="{{ loop.index0 }}" min="3" max="20" value="10">
+              <button type="button" class="icon-btn btn-roll-one"
+                      data-idx="{{ loop.index0 }}" title="Roll this stat">↺</button>
+            </div>
+            <span class="modifier" id="man_mod_{{ loop.index0 }}">+0</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+    </div>{# /form-card #}
 
     <div class="form-actions">
       <a href="{{ url_for('character.create_step2') }}" class="btn btn-secondary">← Back</a>
-      <button type="submit" class="btn btn-primary">Create Character</button>
+      <button type="submit" class="btn btn-primary">Create Character →</button>
     </div>
   </form>
 </div>
 
 <script>
-  const useDefaultsCheckbox = document.getElementById('use_defaults');
-  const abilitiesGrid = document.getElementById('abilities-grid');
+  // ─────────────────────────────────────────────
+  // Constants
+  // ─────────────────────────────────────────────
+  const POINT_COST = {8:0, 9:1, 10:2, 11:3, 12:4, 13:5, 14:7, 15:9, 16:10, 17:11, 18:12, 19:13, 20:14};
 
-  // Toggle ability inputs
-  useDefaultsCheckbox.addEventListener('change', function() {
-    if (this.checked) {
-      abilitiesGrid.style.display = 'none';
-    } else {
-      abilitiesGrid.style.display = 'grid';
-    }
+  function modStr(score) {
+    const m = Math.floor((score - 10) / 2);
+    return (m >= 0 ? '+' : '') + m;
+  }
+
+  // ─────────────────────────────────────────────
+  // Tab switching
+  // ─────────────────────────────────────────────
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+      document.getElementById('score_method').value = btn.dataset.tab;
+    });
   });
 
-  // Validate ability scores on submit
-  document.querySelector('form').addEventListener('submit', function(e) {
-    if (!useDefaultsCheckbox.checked) {
-      const inputs = abilitiesGrid.querySelectorAll('input[type="number"]');
-      for (let input of inputs) {
-        const value = parseInt(input.value);
-        if (isNaN(value) || value < 3 || value > 18) {
-          e.preventDefault();
-          alert('All ability scores must be between 3 and 18');
-          return;
-        }
+  // ─────────────────────────────────────────────
+  // Standard Array
+  // ─────────────────────────────────────────────
+  const saSelects = document.querySelectorAll('.sa-select');
+
+  function updateSA() {
+    const chosen = new Set([...saSelects].map(s => s.value).filter(v => v));
+    saSelects.forEach(sel => {
+      const mine = sel.value;
+      sel.querySelectorAll('option').forEach(opt => {
+        opt.disabled = opt.value !== '' && opt.value !== mine && chosen.has(opt.value);
+      });
+      const modEl = document.getElementById('sa_mod_' + sel.dataset.idx);
+      if (mine) {
+        modEl.textContent = modStr(+mine);
+        modEl.classList.remove('muted');
+      } else {
+        modEl.textContent = '';
+        modEl.classList.add('muted');
       }
+    });
+    // Hide warning once all filled
+    if (![...saSelects].some(s => !s.value)) {
+      document.getElementById('sa-warning').classList.add('hidden');
     }
+  }
+
+  saSelects.forEach(s => s.addEventListener('change', updateSA));
+  updateSA();
+
+  // ─────────────────────────────────────────────
+  // Point Buy
+  // ─────────────────────────────────────────────
+  const pbScores = [8, 8, 8, 8, 8, 8];
+  const pbBudgetSel   = document.getElementById('pb-budget');
+  const pbRemainingEl = document.getElementById('pb-remaining');
+
+  function pbBudget() { return +pbBudgetSel.value; }
+  function pbSpent()  { return pbScores.reduce((t, s) => t + (POINT_COST[s] ?? 0), 0); }
+
+  function renderPB() {
+    const budget    = pbBudget();
+    const remaining = budget - pbSpent();
+
+    pbRemainingEl.textContent = remaining;
+    pbRemainingEl.style.color =
+      remaining < 0 ? '#e53e3e' : remaining === 0 ? '#38a169' : 'inherit';
+    document.getElementById('pb_budget_hidden').value = budget;
+
+    for (let i = 0; i < 6; i++) {
+      const s = pbScores[i];
+      document.getElementById('pb_score_' + i).textContent = s;
+      document.getElementById('pb_mod_'   + i).textContent = modStr(s);
+      document.getElementById('pb_cost_'  + i).textContent = POINT_COST[s] ?? 0;
+
+      const costUp = s < 20 ? (POINT_COST[s + 1] - POINT_COST[s]) : 99;
+      document.querySelector(`.pb-btn[data-idx="${i}"][data-delta="-1"]`).disabled = s <= 8;
+      document.querySelector(`.pb-btn[data-idx="${i}"][data-delta="1"]`).disabled  = s >= 20 || remaining < costUp;
+    }
+  }
+
+  document.querySelectorAll('.pb-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i    = +btn.dataset.idx;
+      const next = pbScores[i] + +btn.dataset.delta;
+      if (next < 8 || next > 20) return;
+      if (+btn.dataset.delta > 0) {
+        const extra = POINT_COST[next] - POINT_COST[pbScores[i]];
+        if (pbBudget() - pbSpent() < extra) return;
+      }
+      pbScores[i] = next;
+      renderPB();
+    });
+  });
+
+  pbBudgetSel.addEventListener('change', renderPB);
+  renderPB();
+
+  // ─────────────────────────────────────────────
+  // Manual / Rolled
+  // ─────────────────────────────────────────────
+  function roll4d6dl() {
+    const d = [1,2,3,4].map(() => Math.ceil(Math.random() * 6)).sort((a,b) => b-a);
+    return d[0] + d[1] + d[2];
+  }
+
+  function setManual(i, val) {
+    document.getElementById('man_' + i).value = val;
+    document.getElementById('man_mod_' + i).textContent = modStr(val);
+  }
+
+  document.querySelectorAll('.man-input').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const v = +inp.value;
+      document.getElementById('man_mod_' + inp.dataset.idx).textContent =
+        (v >= 3 && v <= 20) ? modStr(v) : '?';
+    });
+  });
+
+  document.querySelectorAll('.btn-roll-one').forEach(btn => {
+    btn.addEventListener('click', () => setManual(+btn.dataset.idx, roll4d6dl()));
+  });
+
+  document.getElementById('roll-all').addEventListener('click', () => {
+    for (let i = 0; i < 6; i++) setManual(i, roll4d6dl());
+  });
+
+  // Init manual modifiers
+  for (let i = 0; i < 6; i++) setManual(i, 10);
+
+  // ─────────────────────────────────────────────
+  // Form submit — validate & sync hidden inputs
+  // ─────────────────────────────────────────────
+  document.getElementById('ability-form').addEventListener('submit', e => {
+    const method = document.getElementById('score_method').value;
+    let scores = [];
+    let err    = null;
+
+    if (method === 'standard') {
+      scores = [...saSelects].map(s => +s.value || 0);
+      if (scores.includes(0)) {
+        err = 'Assign a value to every ability before continuing.';
+        const warn = document.getElementById('sa-warning');
+        warn.textContent = err;
+        warn.classList.remove('hidden');
+      }
+
+    } else if (method === 'pointbuy') {
+      scores = [...pbScores];
+      const rem = pbBudget() - pbSpent();
+      if (rem > 0) err = `You have ${rem} unspent point${rem > 1 ? 's' : ''}. Spend all points before continuing.`;
+      if (rem < 0) err = `You are ${-rem} point${-rem > 1 ? 's' : ''} over budget.`;
+      if (err) alert(err);
+
+    } else { // manual
+      for (let i = 0; i < 6; i++) {
+        const v = +document.getElementById('man_' + i).value;
+        if (isNaN(v) || v < 3 || v > 20) { err = 'All scores must be between 3 and 20.'; break; }
+        scores.push(v);
+      }
+      if (err) alert(err);
+    }
+
+    if (err) { e.preventDefault(); return; }
+
+    for (let i = 0; i < 6; i++) document.getElementById('h' + i).value = scores[i];
   });
 </script>
 
 <style>
-  .create-character-container {
-    max-width: 600px;
+  .step3-container {
+    max-width: 680px;
     margin: 2rem auto;
-    padding: 2rem;
+    padding: 0 1rem 3rem;
   }
 
-  .character-form {
+  /* ── Card ── */
+  .form-card {
     background: white;
     border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    padding: 2rem;
-  }
-
-  .form-section {
-    margin-bottom: 2rem;
-  }
-
-  .form-section h2 {
-    margin-bottom: 0.5rem;
-    color: #333;
-  }
-
-  .form-section > p {
-    margin: 0 0 1.5rem 0;
-    color: #666;
-  }
-
-  .use-defaults-group {
+    box-shadow: 0 2px 8px rgba(0,0,0,.1);
+    overflow: hidden;
     margin-bottom: 1.5rem;
   }
 
-  .use-defaults-group label {
+  /* ── Tabs ── */
+  .method-tabs {
     display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    cursor: pointer;
+    border-bottom: 2px solid #e8e8e8;
+  }
+
+  .tab-btn {
+    flex: 1;
+    padding: .875rem .5rem;
+    border: none;
+    background: transparent;
+    font-size: .9rem;
     font-weight: 500;
-  }
-
-  .use-defaults-group input[type="checkbox"] {
-    width: auto;
+    color: #888;
     cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    transition: color .15s, border-color .15s, background .15s;
+    font-family: inherit;
   }
 
+  .tab-btn:hover { color: #333; background: #fafafa; }
+
+  .tab-btn.active {
+    color: #667eea;
+    border-bottom-color: #667eea;
+    background: white;
+  }
+
+  /* ── Panels ── */
+  .tab-panel { display: none; padding: 1.5rem 2rem 2rem; }
+  .tab-panel.active { display: block; }
+
+  .method-desc {
+    margin: 0 0 1.25rem;
+    color: #666;
+    font-size: .9rem;
+    line-height: 1.5;
+  }
+
+  /* ── Ability rows (shared) ── */
   .abilities-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 1.5rem;
-  }
-
-  .ability-input {
     display: flex;
     flex-direction: column;
+    gap: .625rem;
   }
 
-  .ability-input label {
+  .ability-row {
+    display: flex;
+    align-items: center;
+    gap: .875rem;
+  }
+
+  .ability-label {
+    width: 115px;
     font-weight: 500;
-    margin-bottom: 0.5rem;
     color: #333;
+    flex-shrink: 0;
+    font-size: .95rem;
   }
 
-  .ability-input input {
-    padding: 0.75rem;
+  .modifier {
+    width: 38px;
+    text-align: right;
+    font-weight: 600;
+    color: #667eea;
+    font-size: .95rem;
+  }
+
+  .modifier.muted { color: #bbb; }
+
+  /* ── Standard Array ── */
+  .sa-select {
+    width: 86px;
+    padding: .45rem .6rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-family: inherit;
+    cursor: pointer;
+    background: white;
+  }
+
+  .sa-select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102,126,234,.12);
+  }
+
+  /* ── Point Buy ── */
+  .pb-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: .75rem;
+    margin-bottom: .5rem;
+  }
+
+  .budget-row {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+  }
+
+  .budget-label { font-weight: 500; color: #555; font-size: .9rem; }
+
+  .budget-select {
+    padding: .35rem .6rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: .9rem;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .pb-remaining-display { font-size: .95rem; color: #555; }
+  .pb-remaining-display strong { font-size: 1.1rem; }
+
+  .pb-control {
+    display: flex;
+    align-items: center;
+    gap: .375rem;
+  }
+
+  .pb-score {
+    width: 32px;
+    text-align: center;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #222;
+  }
+
+  .cost-badge {
+    font-size: .78rem;
+    color: #aaa;
+    min-width: 44px;
+  }
+
+  /* ── Manual ── */
+  .roll-all-btn { margin-bottom: 1.25rem; }
+
+  .manual-control {
+    display: flex;
+    align-items: center;
+    gap: .375rem;
+  }
+
+  .man-input {
+    width: 68px;
+    padding: .45rem .5rem;
     border: 1px solid #ddd;
     border-radius: 4px;
     font-size: 1rem;
@@ -157,49 +488,60 @@
     text-align: center;
   }
 
-  .ability-input input:focus {
+  .man-input:focus {
     outline: none;
     border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    box-shadow: 0 0 0 3px rgba(102,126,234,.12);
   }
 
+  /* ── Shared icon buttons (pb +/-, roll ↺) ── */
+  .icon-btn {
+    width: 28px;
+    height: 28px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #f4f4f4;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: background .12s;
+    font-family: inherit;
+  }
+
+  .icon-btn:hover:not(:disabled) { background: #e4e4e4; }
+  .icon-btn:disabled { opacity: .3; cursor: not-allowed; }
+
+  /* ── Warning ── */
+  .warning { color: #e53e3e; font-size: .875rem; margin: .75rem 0 0; }
+  .hidden  { display: none !important; }
+
+  /* ── Form actions ── */
   .form-actions {
     display: flex;
     gap: 1rem;
     justify-content: space-between;
-    margin-top: 2rem;
-    padding-top: 2rem;
-    border-top: 1px solid #e0e0e0;
   }
 
   .btn {
-    padding: 0.75rem 1.5rem;
+    padding: .75rem 1.5rem;
     border: none;
     border-radius: 4px;
     font-weight: 500;
     cursor: pointer;
     font-size: 1rem;
-    transition: all 0.2s;
+    transition: all .2s;
     text-decoration: none;
     display: inline-block;
+    font-family: inherit;
   }
 
-  .btn-primary {
-    background: #667eea;
-    color: white;
-  }
-
-  .btn-primary:hover {
-    background: #5568d3;
-  }
-
-  .btn-secondary {
-    background: #e0e0e0;
-    color: #333;
-  }
-
-  .btn-secondary:hover {
-    background: #d0d0d0;
-  }
+  .btn-primary { background: #667eea; color: white; }
+  .btn-primary:hover { background: #5568d3; }
+  .btn-secondary { background: #e0e0e0; color: #333; }
+  .btn-secondary:hover { background: #d0d0d0; }
 </style>
 {% endblock %}
