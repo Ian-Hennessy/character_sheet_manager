@@ -436,6 +436,8 @@ class Character:
         """Check if character has HP > 0"""
         return self.data.get("hit_points", 0) > 0
 
+""" Methods for managing character spell list
+and spell slots """
 
 
 

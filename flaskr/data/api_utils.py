@@ -124,3 +124,19 @@ def get_all_available_species() -> list[str]:
     if data and 'results' in data:
         return [race['name'] for race in data['results']]
     return []
+
+
+def get_class_spells(class_index: str) -> list:
+    """
+    Fetch all spells available to a class (cached).
+    Returns a list of {index, name, url} dicts, or [] for non-casters.
+    """
+    data = get_cached_or_fetch('class_spells', class_index, f'2014/classes/{class_index}/spells')
+    if data and 'results' in data:
+        return data['results']
+    return []
+
+
+def get_spell_detail(spell_index: str) -> Optional[Dict[str, Any]]:
+    """Fetch full details for a single spell (cached)."""
+    return get_cached_or_fetch('spell', spell_index, f'2014/spells/{spell_index}')
