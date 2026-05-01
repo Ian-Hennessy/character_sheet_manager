@@ -55,7 +55,6 @@ def create_character(
         "species": species_name,
         "level": level,
         "experience": 0,
-        
         # Abilities
         "ability_scores": ability_scores.copy(),  # [STR, DEX, CON, INT, WIS, CHA]
         "modifiers": _calculate_modifiers(ability_scores),
@@ -84,10 +83,11 @@ def create_character(
         "saving_throws": _initialize_saving_throws(ability_scores),
         
         # Spellcasting
+        # spell_slots[0] is unused; indices 1-9 = available slots per spell level
         "spellcasting_ability": dnd_class.get_spellcasting_ability(),
-        "spell_slots": {
-            f"level_{i}": 0 for i in range(1, 10)
-        },
+        "spell_slots": _get_spell_slots_for_level(_level_data),
+        "spell_slots_used": [0] * 10,
+        "known_spells": [],  # List of spell index strings the character has selected
         "spells": [],
         
         # Actions
@@ -188,6 +188,27 @@ def _initialize_saving_throws(ability_scores: List[int]) -> Dict[str, tuple]:
     }
 
 
+def _get_spell_slots_for_level(level_data: Dict[str, Any]) -> List[int]:
+    """
+    Extract spell slots as a list of 10 ints from API level data.
+    Index 0 is unused; indices 1-9 correspond to spell levels 1-9.
+    Returns all zeros for non-spellcasting classes.
+    """
+    sc = level_data.get('spellcasting', {})
+    return [
+        0,
+        sc.get('spell_slots_level_1', 0),
+        sc.get('spell_slots_level_2', 0),
+        sc.get('spell_slots_level_3', 0),
+        sc.get('spell_slots_level_4', 0),
+        sc.get('spell_slots_level_5', 0),
+        sc.get('spell_slots_level_6', 0),
+        sc.get('spell_slots_level_7', 0),
+        sc.get('spell_slots_level_8', 0),
+        sc.get('spell_slots_level_9', 0),
+    ]
+
+
 def apply_class_proficiencies(character: Character, class_choices: Optional[Dict[str, List[str]]] = None) -> None:
     """
     Apply class proficiency selections to character.
@@ -267,6 +288,10 @@ def level_up(character: Character) -> Dict[str, Any]:
     character.data['features'] = new_level_data.get('features', [])
     character.data['class_specific'] = new_level_data.get('class_specific', {})
     character.data['proficiency_bonus'] = new_level_data.get('prof_bonus', new_proficiency)
+
+    # Update spell slots to match new level (reset used slots)
+    character.data['spell_slots'] = _get_spell_slots_for_level(new_level_data)
+    character.data['spell_slots_used'] = [0] * 10
     return {
         'old_level': old_level,
         'new_level': character.data['level'],

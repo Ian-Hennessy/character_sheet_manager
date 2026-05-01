@@ -1,0 +1,360 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ character.name }} - Spells{% endblock %}
+
+{% block header %}
+  <h1>{{ character.name }} - Spells</h1>
+  <p>{{ character.class }} · {{ character.spellcasting_ability | capitalize if character.spellcasting_ability else 'No spellcasting' }} spellcasting</p>
+{% endblock %}
+
+{% block content %}
+<style>
+  .spells-container { max-width: 960px; margin: 0 auto; padding: 1rem; }
+
+  .spells-header { margin-bottom: 1.5rem; }
+
+  /* ── Spell Slots ── */
+  .slot-section { margin-bottom: 2rem; }
+  .slot-section h2 { margin-bottom: 0.75rem; }
+  .slot-grid { display: flex; flex-wrap: wrap; gap: 1rem; }
+  .slot-level-card {
+    background: #f8f9ff;
+    border: 1px solid #dde;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    min-width: 140px;
+  }
+  .slot-level-label { font-weight: 600; font-size: 0.85rem; color: #555; margin-bottom: 0.5rem; }
+  .slot-pips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .slot-pip {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    border: 2px solid #667eea;
+    background: white;
+    cursor: pointer;
+    transition: background 0.15s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .slot-pip.used { background: #667eea; }
+  .slot-pip:hover { opacity: 0.75; }
+  .no-slots-msg { color: #999; font-style: italic; }
+
+  .long-rest-btn { margin-top: 1rem; }
+
+  /* ── Known Spells ── */
+  .known-section { margin-bottom: 2rem; }
+  .known-section h2 { margin-bottom: 0.75rem; }
+  .empty-message { color: #999; font-style: italic; }
+
+  .spell-card {
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    overflow: hidden;
+  }
+  .spell-header {
+    display: flex;
+    align-items: center;
+    padding: 0.6rem 1rem;
+    cursor: pointer;
+    background: #fafafa;
+    gap: 0.75rem;
+  }
+  .spell-header:hover { background: #f0f2ff; }
+  .spell-name { font-weight: 600; flex: 1; }
+  .spell-meta { font-size: 0.8rem; color: #777; }
+  .spell-level-badge {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: #e8ebff;
+    color: #445;
+    white-space: nowrap;
+  }
+  .chevron { transition: transform 0.2s; margin-left: auto; color: #aaa; }
+  .spell-body {
+    display: none;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid #eee;
+    background: white;
+  }
+  .spell-body.open { display: block; }
+  .spell-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.4rem 1rem;
+    font-size: 0.85rem;
+    margin-bottom: 0.75rem;
+    color: #555;
+  }
+  .spell-detail-grid span { display: block; }
+  .spell-detail-grid strong { color: #333; }
+  .spell-desc p { margin: 0.3rem 0; font-size: 0.9rem; }
+  .remove-spell-btn { margin-top: 0.5rem; }
+
+  /* ── Browser ── */
+  .browser-section { margin-bottom: 2rem; }
+  .browser-section h2 { margin-bottom: 0.5rem; }
+  .browser-controls { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+  #spell-search {
+    padding: 0.4rem 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    flex: 1;
+    min-width: 160px;
+  }
+  .browser-list { display: flex; flex-direction: column; gap: 0.4rem; max-height: 400px; overflow-y: auto; }
+  .browser-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #e8e8e8;
+    border-radius: 5px;
+    background: #fafafa;
+  }
+  .browser-item-name { flex: 1; font-size: 0.9rem; }
+  .no-browser-msg { color: #999; font-style: italic; font-size: 0.9rem; }
+
+  /* ── Shared buttons ── */
+  .btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    transition: background 0.2s;
+  }
+  .btn-primary { background: #667eea; color: white; }
+  .btn-primary:hover { background: #5568d3; }
+  .btn-secondary { background: #e0e0e0; color: #333; }
+  .btn-secondary:hover { background: #d0d0d0; }
+  .btn-danger { background: #ff6b6b; color: white; }
+  .btn-danger:hover { background: #ff5252; }
+  .btn-sm { padding: 0.3rem 0.65rem; font-size: 0.8rem; }
+  .btn-success { background: #4caf50; color: white; }
+  .btn-success:hover { background: #43a047; }
+</style>
+
+<div class="spells-container">
+  <div class="spells-header">
+    <a href="{{ url_for('character.view', character_id=character_id) }}" class="btn btn-secondary">← Back to Character Sheet</a>
+  </div>
+
+  <!-- ── Spell Slots ── -->
+  <div class="slot-section">
+    <h2>Spell Slots</h2>
+    {% if slot_levels %}
+      <div class="slot-grid" id="slot-grid">
+        {% for row in slot_levels %}
+          <div class="slot-level-card">
+            <div class="slot-level-label">Level {{ row.level }}</div>
+            <div class="slot-pips" id="pips-{{ row.level }}">
+              {% for i in range(row.total) %}
+                <div
+                  class="slot-pip {% if i < row.used %}used{% endif %}"
+                  data-level="{{ row.level }}"
+                  data-index="{{ i }}"
+                  title="{% if i < row.used %}Click to restore{% else %}Click to use{% endif %}"
+                  onclick="toggleSlot({{ character_id }}, {{ row.level }}, this)"
+                ></div>
+              {% endfor %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+      <button class="btn btn-secondary long-rest-btn" onclick="longRest({{ character_id }})">Long Rest (restore all slots)</button>
+    {% else %}
+      <p class="no-slots-msg">This character has no spell slots at their current level.</p>
+    {% endif %}
+  </div>
+
+  <!-- ── Known Spells ── -->
+  <div class="known-section">
+    <h2>Known / Prepared Spells</h2>
+    {% if known_spells %}
+      <div id="known-spells-list">
+        {% for spell in known_spells %}
+          <div class="spell-card" id="known-{{ spell.index }}">
+            <div class="spell-header" onclick="toggleSpell(this)">
+              <span class="spell-name">{{ spell.name }}</span>
+              <span class="spell-level-badge">
+                {% if spell.level == 0 %}Cantrip{% else %}Level {{ spell.level }}{% endif %}
+              </span>
+              {% if spell.concentration %}<span class="spell-meta">Conc.</span>{% endif %}
+              {% if spell.ritual %}<span class="spell-meta">Ritual</span>{% endif %}
+              <span class="chevron">▾</span>
+            </div>
+            <div class="spell-body">
+              <div class="spell-detail-grid">
+                <span><strong>Casting Time:</strong> {{ spell.casting_time }}</span>
+                <span><strong>Range:</strong> {{ spell.range }}</span>
+                <span><strong>Duration:</strong> {{ spell.duration }}</span>
+                <span><strong>School:</strong> {{ spell.school }}</span>
+                <span><strong>Components:</strong> {{ spell.components | join(', ') }}{% if spell.material %} ({{ spell.material }}){% endif %}</span>
+              </div>
+              <div class="spell-desc">
+                {% for para in spell.desc %}
+                  <p>{{ para }}</p>
+                {% endfor %}
+                {% if spell.higher_level %}
+                  <p><strong>At Higher Levels:</strong> {{ spell.higher_level | join(' ') }}</p>
+                {% endif %}
+              </div>
+              <button
+                class="btn btn-danger btn-sm remove-spell-btn"
+                onclick="removeSpell({{ character_id }}, '{{ spell.index }}', this)"
+              >Remove Spell</button>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="empty-message" id="no-known-msg">No spells added yet. Browse your class list below to add spells.</p>
+    {% endif %}
+  </div>
+
+  <!-- ── Spell Browser ── -->
+  <div class="browser-section">
+    <h2>Class Spell List</h2>
+    {% if class_spell_list %}
+      <div class="browser-controls">
+        <input type="text" id="spell-search" placeholder="Filter spells..." oninput="filterSpells()">
+      </div>
+      <div class="browser-list" id="browser-list">
+        {% for spell in class_spell_list %}
+          <div class="browser-item" data-name="{{ spell.name | lower }}" id="browser-{{ spell.index }}">
+            <span class="browser-item-name">{{ spell.name }}</span>
+            <button
+              class="btn btn-success btn-sm"
+              onclick="addSpell({{ character_id }}, '{{ spell.index }}', '{{ spell.name | replace("'", "\\'") }}', this)"
+            >Add</button>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="no-browser-msg">
+        {% if character.spellcasting_ability %}
+          All class spells already added, or no spells found for this class.
+        {% else %}
+          This class does not have a spell list.
+        {% endif %}
+      </p>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+  // Toggle spell accordion
+  function toggleSpell(header) {
+    const body = header.nextElementSibling;
+    const chevron = header.querySelector('.chevron');
+    body.classList.toggle('open');
+    chevron.style.transform = body.classList.contains('open') ? 'rotate(180deg)' : '';
+  }
+
+  // Spell slot toggle (click pip to use or restore)
+  function toggleSlot(charId, level, pip) {
+    const isUsed = pip.classList.contains('used');
+    const url = isUsed
+      ? `/character/${charId}/spells/slot/restore/${level}`
+      : `/character/${charId}/spells/slot/use/${level}`;
+
+    fetch(url, { method: 'POST' })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          refreshPips(charId, level, data.used, data.total);
+        } else {
+          alert(data.error || 'Error updating slot');
+        }
+      })
+      .catch(() => alert('Error updating slot'));
+  }
+
+  function refreshPips(charId, level, used, total) {
+    const container = document.getElementById(`pips-${level}`);
+    if (!container) return;
+    container.querySelectorAll('.slot-pip').forEach((pip, i) => {
+      pip.classList.toggle('used', i < used);
+      pip.title = i < used ? 'Click to restore' : 'Click to use';
+    });
+  }
+
+  // Long rest — restore all spell slots
+  function longRest(charId) {
+    if (!confirm('Take a long rest and restore all spell slots?')) return;
+    fetch(`/character/${charId}/spells/slot/reset`, { method: 'POST' })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          document.querySelectorAll('.slot-pip').forEach(pip => {
+            pip.classList.remove('used');
+            pip.title = 'Click to use';
+          });
+        } else {
+          alert(data.error || 'Error resetting slots');
+        }
+      })
+      .catch(() => alert('Error resetting slots'));
+  }
+
+  // Add spell from browser
+  function addSpell(charId, spellIndex, spellName, btn) {
+    const formData = new FormData();
+    formData.append('spell_index', spellIndex);
+
+    fetch(`/character/${charId}/spells/add`, { method: 'POST', body: formData })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          // Remove from browser list
+          const row = document.getElementById(`browser-${spellIndex}`);
+          if (row) row.remove();
+          // Reload page to show full spell detail in known list
+          location.reload();
+        } else {
+          alert(data.error || 'Error adding spell');
+        }
+      })
+      .catch(() => alert('Error adding spell'));
+  }
+
+  // Remove spell from known list
+  function removeSpell(charId, spellIndex, btn) {
+    if (!confirm('Remove this spell from your list?')) return;
+    fetch(`/character/${charId}/spells/remove/${spellIndex}`, { method: 'POST' })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          const card = document.getElementById(`known-${spellIndex}`);
+          if (card) card.remove();
+          // Show empty message if no spells left
+          const list = document.getElementById('known-spells-list');
+          if (list && list.children.length === 0) {
+            const msg = document.createElement('p');
+            msg.className = 'empty-message';
+            msg.id = 'no-known-msg';
+            msg.textContent = 'No spells added yet. Browse your class list below to add spells.';
+            list.replaceWith(msg);
+          }
+        } else {
+          alert(data.error || 'Error removing spell');
+        }
+      })
+      .catch(() => alert('Error removing spell'));
+  }
+
+  // Filter spell browser by name
+  function filterSpells() {
+    const query = document.getElementById('spell-search').value.toLowerCase();
+    document.querySelectorAll('#browser-list .browser-item').forEach(item => {
+      item.style.display = item.dataset.name.includes(query) ? '' : 'none';
+    });
+  }
+</script>
+{% endblock %}

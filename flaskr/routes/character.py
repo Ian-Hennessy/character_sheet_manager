@@ -18,7 +18,7 @@ from flaskr.db import get_db
 from flaskr.character_factory import create_character
 from flaskr.data.base_classes import DndClass
 from flaskr.data.base_species import DndSpecies
-from flaskr.data.api_utils import get_feature_detail, get_class_level_data
+from flaskr.data.api_utils import get_feature_detail, get_class_level_data, get_class_spells, get_spell_detail
 from flaskr.character import Character
 
 bp = Blueprint('character', __name__, url_prefix='/character')
@@ -452,6 +452,22 @@ def level_up(character_id):
         data['features'] = level_data.get('features', data.get('features', []))
         data['class_specific'] = level_data.get('class_specific', data.get('class_specific', {}))
 
+        # Update spell slots from the new level's spellcasting data and reset used slots
+        sc = level_data.get('spellcasting', {})
+        data['spell_slots'] = [
+            0,
+            sc.get('spell_slots_level_1', 0),
+            sc.get('spell_slots_level_2', 0),
+            sc.get('spell_slots_level_3', 0),
+            sc.get('spell_slots_level_4', 0),
+            sc.get('spell_slots_level_5', 0),
+            sc.get('spell_slots_level_6', 0),
+            sc.get('spell_slots_level_7', 0),
+            sc.get('spell_slots_level_8', 0),
+            sc.get('spell_slots_level_9', 0),
+        ]
+        data['spell_slots_used'] = [0] * 10
+
         # Add HP (hit die + CON modifier)
         hit_die = data.get('hit_die', 8)
         con_mod = data['modifiers'][2]
@@ -660,7 +676,207 @@ def add_feat(character_id):
     except (json.JSONDecodeError, KeyError) as e:
         logger.error(f"Error adding feat: {e}")
         return jsonify({'error': 'Error adding feat'}), 500
+    
+def _normalize_spell_slots(data: dict) -> tuple:
+    """Return (spell_slots, spell_slots_used) as lists of 10 ints, migrating old dict format."""
+    slots = data.get('spell_slots', [0] * 10)
+    if isinstance(slots, dict):
+        slots = [0] + [slots.get(f'level_{i}', 0) for i in range(1, 10)]
+    used = data.get('spell_slots_used', [0] * 10)
+    return slots, used
 
+
+@bp.route('/<int:character_id>/spells/list', methods=['GET'])
+@login_required
+@character_owner_required
+def list_spells(character_id):
+    """List character spells, slot tracker, and class spell browser."""
+    db = get_db()
+    char = db.execute('SELECT data FROM characters WHERE id = ?', (character_id,)).fetchone()
+
+    try:
+        data = json.loads(char['data'])
+    except json.JSONDecodeError as e:
+        logger.error(f"Error loading spells: {e}")
+        flash('Error loading character spells', 'error')
+        return redirect(url_for('character.view', character_id=character_id))
+
+    spell_slots, spell_slots_used = _normalize_spell_slots(data)
+    known_indices = data.get('known_spells', [])
+
+    # Fetch full detail for each known spell (cached)
+    known_spells = []
+    for idx in known_indices:
+        detail = get_spell_detail(idx)
+        if detail:
+            known_spells.append({
+                'index': idx,
+                'name': detail.get('name', idx),
+                'level': detail.get('level', 0),
+                'school': detail.get('school', {}).get('name', ''),
+                'casting_time': detail.get('casting_time', ''),
+                'range': detail.get('range', ''),
+                'duration': detail.get('duration', ''),
+                'concentration': detail.get('concentration', False),
+                'ritual': detail.get('ritual', False),
+                'components': detail.get('components', []),
+                'material': detail.get('material', ''),
+                'desc': detail.get('desc', []),
+                'higher_level': detail.get('higher_level', []),
+            })
+
+    # Fetch class spell list for the browser
+    class_index = data.get('class', '').lower().replace(' ', '-')
+    class_spell_list = []
+    for s in get_class_spells(class_index):
+        if s['index'] not in known_indices:
+            # only include spells at or below character's maximum slot level
+            if s['level'] <= max(i for i in range(10) if spell_slots[i] > 0):
+                class_spell_list.append({'index': s['index'], 'name': s['name']})
+
+    # Build slot rows — only include levels that have at least one slot
+    slot_levels = [
+        {'level': i, 'total': spell_slots[i], 'used': spell_slots_used[i]}
+        for i in range(1, 10)
+        if spell_slots[i] > 0
+    ]
+
+    return render_template(
+        'character/spells.html',
+        character_id=character_id,
+        character=data,
+        spell_slots=spell_slots,
+        slot_levels=slot_levels,
+        known_spells=known_spells,
+        class_spell_list=class_spell_list,
+    )
+
+
+@bp.route('/<int:character_id>/spells/slot/use/<int:slot_level>', methods=['POST'])
+@login_required
+@character_owner_required
+def use_spell_slot(character_id, slot_level):
+    """Mark one spell slot at the given level as used."""
+    if not 1 <= slot_level <= 9:
+        return jsonify({'error': 'Invalid slot level'}), 400
+
+    db = get_db()
+    char = db.execute('SELECT data FROM characters WHERE id = ?', (character_id,)).fetchone()
+    try:
+        data = json.loads(char['data'])
+        slots, used = _normalize_spell_slots(data)
+        if used[slot_level] >= slots[slot_level]:
+            return jsonify({'error': 'No slots remaining'}), 400
+        used[slot_level] += 1
+        data['spell_slots'] = slots
+        data['spell_slots_used'] = used
+        db.execute('UPDATE characters SET data = ?, updated = CURRENT_TIMESTAMP WHERE id = ?',
+                   (json.dumps(data), character_id))
+        db.commit()
+        return jsonify({'success': True, 'used': used[slot_level], 'total': slots[slot_level]})
+    except (json.JSONDecodeError, KeyError) as e:
+        logger.error(f"Error using spell slot: {e}")
+        return jsonify({'error': 'Server error'}), 500
+
+
+@bp.route('/<int:character_id>/spells/slot/restore/<int:slot_level>', methods=['POST'])
+@login_required
+@character_owner_required
+def restore_spell_slot(character_id, slot_level):
+    """Mark one spell slot at the given level as restored."""
+    if not 1 <= slot_level <= 9:
+        return jsonify({'error': 'Invalid slot level'}), 400
+
+    db = get_db()
+    char = db.execute('SELECT data FROM characters WHERE id = ?', (character_id,)).fetchone()
+    try:
+        data = json.loads(char['data'])
+        slots, used = _normalize_spell_slots(data)
+        if used[slot_level] <= 0:
+            return jsonify({'error': 'No used slots to restore'}), 400
+        used[slot_level] -= 1
+        data['spell_slots'] = slots
+        data['spell_slots_used'] = used
+        db.execute('UPDATE characters SET data = ?, updated = CURRENT_TIMESTAMP WHERE id = ?',
+                   (json.dumps(data), character_id))
+        db.commit()
+        return jsonify({'success': True, 'used': used[slot_level], 'total': slots[slot_level]})
+    except (json.JSONDecodeError, KeyError) as e:
+        logger.error(f"Error restoring spell slot: {e}")
+        return jsonify({'error': 'Server error'}), 500
+
+
+@bp.route('/<int:character_id>/spells/slot/reset', methods=['POST'])
+@login_required
+@character_owner_required
+def reset_spell_slots(character_id):
+    """Restore all spell slots (long rest)."""
+    db = get_db()
+    char = db.execute('SELECT data FROM characters WHERE id = ?', (character_id,)).fetchone()
+    try:
+        data = json.loads(char['data'])
+        slots, _ = _normalize_spell_slots(data)
+        data['spell_slots'] = slots
+        data['spell_slots_used'] = [0] * 10
+        db.execute('UPDATE characters SET data = ?, updated = CURRENT_TIMESTAMP WHERE id = ?',
+                   (json.dumps(data), character_id))
+        db.commit()
+        return jsonify({'success': True})
+    except (json.JSONDecodeError, KeyError) as e:
+        logger.error(f"Error resetting spell slots: {e}")
+        return jsonify({'error': 'Server error'}), 500
+
+
+@bp.route('/<int:character_id>/spells/add', methods=['POST'])
+@login_required
+@character_owner_required
+def add_spell(character_id):
+    """Add a spell to the character's known spells."""
+    spell_index = request.form.get('spell_index', '').strip()
+    if not spell_index:
+        return jsonify({'error': 'Missing spell index'}), 400
+
+    db = get_db()
+    char = db.execute('SELECT data FROM characters WHERE id = ?', (character_id,)).fetchone()
+    try:
+        data = json.loads(char['data'])
+        known = data.get('known_spells', [])
+        if spell_index in known:
+            return jsonify({'error': 'Spell already known'}), 400
+        known.append(spell_index)
+        data['known_spells'] = known
+        db.execute('UPDATE characters SET data = ?, updated = CURRENT_TIMESTAMP WHERE id = ?',
+                   (json.dumps(data), character_id))
+        db.commit()
+        detail = get_spell_detail(spell_index)
+        spell_name = detail.get('name', spell_index) if detail else spell_index
+        return jsonify({'success': True, 'spell': spell_name})
+    except (json.JSONDecodeError, KeyError) as e:
+        logger.error(f"Error adding spell: {e}")
+        return jsonify({'error': 'Server error'}), 500
+
+
+@bp.route('/<int:character_id>/spells/remove/<spell_index>', methods=['POST'])
+@login_required
+@character_owner_required
+def remove_spell(character_id, spell_index):
+    """Remove a spell from the character's known spells."""
+    db = get_db()
+    char = db.execute('SELECT data FROM characters WHERE id = ?', (character_id,)).fetchone()
+    try:
+        data = json.loads(char['data'])
+        known = data.get('known_spells', [])
+        if spell_index not in known:
+            return jsonify({'error': 'Spell not found'}), 404
+        known.remove(spell_index)
+        data['known_spells'] = known
+        db.execute('UPDATE characters SET data = ?, updated = CURRENT_TIMESTAMP WHERE id = ?',
+                   (json.dumps(data), character_id))
+        db.commit()
+        return jsonify({'success': True})
+    except (json.JSONDecodeError, KeyError) as e:
+        logger.error(f"Error removing spell: {e}")
+        return jsonify({'error': 'Server error'}), 500
 
 @bp.route('/<int:character_id>/feats/<int:feat_index>/remove', methods=['POST'])
 @login_required

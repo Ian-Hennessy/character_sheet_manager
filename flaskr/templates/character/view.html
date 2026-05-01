@@ -98,6 +98,10 @@
         View Features & Feats
       </a>
 
+      <a href="{{ url_for('character.list_spells', character_id=character_id) }}" class="btn btn-secondary">
+        Spells
+      </a>
+
       <a href="{{ url_for('character.delete_confirm', character_id=character_id) }}" class="btn btn-danger">
         Delete Character
       </a>
