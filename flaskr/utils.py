@@ -10,7 +10,7 @@ import werkzeug
 import flask
 
 """
-Enum to pass to specified_api_request to specify which 
+Enum to pass to specified_api_request to specify which
 field to generate a request for an API response.
 """
 
@@ -19,9 +19,11 @@ class ApiField(Enum):
     RACES = 'races'
     SUBCLASSES = 'classes/subclasses'
     SUBRACES = 'races/subraces'
-    FEATURES = '/features'
 
 
+def _normalize_class_index(class_name: str) -> str:
+    """Convert a class display name to the API index format (e.g. 'Blood Hunter' -> 'blood-hunter')."""
+    return class_name.lower().replace(' ', '-')
 
 
 
@@ -31,7 +33,7 @@ class ApiField(Enum):
 _api_request formulates an API GET request to the dnd5e api, returning the payload from the 
 https action. 
 """
-def _api_request(field: ApiField, secondary_field: ApiField=None) -> Dict[str, Any]:
+def _api_request(field: ApiField, secondary_field: str=None, tertiary_field: str=None) -> Dict[str, Any]:
     """
     Generate and send a GET request for the input field to the API. 
     Input: field string to request from API 
@@ -39,7 +41,9 @@ def _api_request(field: ApiField, secondary_field: ApiField=None) -> Dict[str, A
     """
     base_url = "https://www.dnd5eapi.co/api/2014/"
     if secondary_field:
-        request_url = base_url + field.value + secondary_field.value
+        request_url = base_url + field.value + secondary_field
+        if tertiary_field:
+            request_url += f"/{tertiary_field}"
     else:
         request_url = base_url + field.value
     payload = {}
@@ -74,3 +78,14 @@ def _extract_index(data: dict, tgt: str) -> list:
 def _specified_api_request(base_field: ApiField, tgt_field: str, ) -> list:
     base_response = _api_request(base_field)
     return _extract_index(base_response, tgt_field)
+
+def _get_class_level_data(class_name: str, level: int) -> Dict[str, Any]:
+    """
+    Fetch the full level data object for a class at a specific level (cached).
+
+    Returns a dict with keys: level, prof_bonus, features, class_specific,
+    ability_score_bonuses, etc. Returns {} on error.
+    """
+    from flaskr.data.api_utils import get_class_level_data
+    index = _normalize_class_index(class_name)
+    return get_class_level_data(index, level) or {}

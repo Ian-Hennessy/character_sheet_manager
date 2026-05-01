@@ -65,3 +65,34 @@ class ContentRegistry:
     @staticmethod
     def get_species(species_name: str, user_id: int = None) -> Dict[str, Any]:
         pass
+
+    @staticmethod
+    def get_level_data(class_name: str, level: int, user_id: int = None) -> Dict[str, Any]:
+        """
+        Return level data for a class at the given level.
+
+        Checks homebrew level tables first (if user_id provided), then falls back
+        to the official SRD API. Returns a dict with keys: level, prof_bonus,
+        features, class_specific, ability_score_bonuses.
+        """
+        from flaskr.db import get_db
+        from . import utils
+
+        db = get_db()
+
+        if user_id:
+            row = db.execute(
+                'SELECT data FROM homebrew_class_levels WHERE user_id = ? AND class_name = ? AND level = ?',
+                (user_id, class_name, level)
+            ).fetchone()
+            if row:
+                return json.loads(row['data'])
+
+        shared = db.execute(
+            'SELECT data FROM homebrew_class_levels WHERE is_public = TRUE AND class_name = ? AND level = ?',
+            (class_name, level)
+        ).fetchone()
+        if shared:
+            return json.loads(shared['data'])
+
+        return utils._get_class_level_data(class_name, level)

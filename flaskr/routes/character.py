@@ -18,6 +18,7 @@ from flaskr.db import get_db
 from flaskr.character_factory import create_character
 from flaskr.data.base_classes import DndClass
 from flaskr.data.base_species import DndSpecies
+from flaskr.data.api_utils import get_feature_detail, get_class_level_data
 from flaskr.character import Character
 
 bp = Blueprint('character', __name__, url_prefix='/character')
@@ -345,7 +346,8 @@ def view(character_id):
     if 'skills' in data:
         for skill_name, (proficient, modifier) in data['skills'].items():
             skills.append({
-                'name': skill_name.title(),
+                'key': skill_name,
+                'name': skill_name.replace('_', ' ').title(),
                 'proficient': proficient,
                 'modifier': modifier,
                 'sign': '+' if modifier >= 0 else ''
@@ -370,6 +372,51 @@ def view(character_id):
         skills=sorted(skills, key=lambda x: x['name']),
         saving_throws=saving_throws
     )
+
+
+# SKILL PROFICIENCY TOGGLE
+
+@bp.route('/<int:character_id>/skills/<skill_name>/toggle', methods=['POST'])
+@login_required
+@character_owner_required
+def toggle_skill_proficiency(character_id, skill_name):
+    """Toggle proficiency on/off for a skill."""
+    db = get_db()
+    char = db.execute(
+        'SELECT data FROM characters WHERE id = ?',
+        (character_id,)
+    ).fetchone()
+
+    try:
+        data = json.loads(char['data'])
+        character = Character(data)
+
+        skills = data.get('skills', {})
+        if skill_name not in skills:
+            return jsonify({'error': f"Unknown skill: {skill_name}"}), 400
+
+        current_proficient, _ = skills[skill_name]
+        character.set_skill_proficiency(skill_name, proficient=not current_proficient)
+
+        new_proficient, new_modifier = character.data['skills'][skill_name]
+
+        db.execute(
+            'UPDATE characters SET data = ?, updated = CURRENT_TIMESTAMP WHERE id = ?',
+            (json.dumps(character.data), character_id)
+        )
+        db.commit()
+
+        return jsonify({
+            'success': True,
+            'skill': skill_name,
+            'proficient': new_proficient,
+            'modifier': new_modifier,
+            'sign': '+' if new_modifier >= 0 else '',
+        })
+
+    except (json.JSONDecodeError, KeyError) as e:
+        logger.error(f"Error toggling skill proficiency: {e}")
+        return jsonify({'error': 'Error updating skill proficiency'}), 500
 
 
 # LEVEL UP
@@ -397,27 +444,28 @@ def level_up(character_id):
         # Level up
         new_level = current_level + 1
         data['level'] = new_level
-        
-        # Recalculate proficiency bonus
-        proficiency_bonuses = [2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6]
-        data['proficiency_bonus'] = proficiency_bonuses[new_level - 1]
-        
+
+        # Fetch authoritative level data from API
+        import random
+        level_data = utils._get_class_level_data(data.get('class', ''), new_level)
+        data['proficiency_bonus'] = level_data.get('prof_bonus', data.get('proficiency_bonus', 2))
+        data['features'] = level_data.get('features', data.get('features', []))
+        data['class_specific'] = level_data.get('class_specific', data.get('class_specific', {}))
+
         # Add HP (hit die + CON modifier)
         hit_die = data.get('hit_die', 8)
         con_mod = data['modifiers'][2]
-        
-        import random
         hp_gain = max(1, random.randint(1, hit_die) + con_mod)
         data['max_hit_points'] += hp_gain
         data['hit_points'] = data['max_hit_points']
-        
+
         # Save changes
         db.execute(
             'UPDATE characters SET data = ?, level = ?, updated = CURRENT_TIMESTAMP WHERE id = ?',
             (json.dumps(data), new_level, character_id)
         )
         db.commit()
-        
+
         return jsonify({
             'success': True,
             'level': new_level,
@@ -540,8 +588,23 @@ def view_features(character_id):
     
     try:
         data = json.loads(char['data'])
-        features = data.get('features', [])
         feats = data.get('feats', [])
+
+        class_index = utils._normalize_class_index(data.get('class', ''))
+        current_level = data.get('level', 1)
+
+        # Collect and enrich features from every level 1..current, in order.
+        features = []
+        for lvl in range(1, current_level + 1):
+            level_data = get_class_level_data(class_index, lvl) or {}
+            for f in level_data.get('features', []):
+                detail = get_feature_detail(f['index'])
+                desc_paragraphs = detail.get('desc', []) if detail else []
+                features.append({
+                    **f,
+                    'gained_at_level': lvl,
+                    'description': '\n\n'.join(desc_paragraphs) if desc_paragraphs else None,
+                })
     except json.JSONDecodeError as e:
         logger.error(f"Error loading features: {e}")
         flash('Error loading character features', 'error')

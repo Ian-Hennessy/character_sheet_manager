@@ -90,6 +90,7 @@
           <div class="accordion-item">
             <button class="accordion-header" onclick="toggleAccordion(this)" type="button">
               <span class="accordion-title">{{ feature.name }}</span>
+              <span class="feature-level">Level {{ feature.gained_at_level }}</span>
               <span class="chevron">▾</span>
             </button>
             <div class="accordion-body">
@@ -269,6 +270,15 @@
   }
 
   .accordion-header:hover { background: #f0f0f8; }
+
+  .feature-level {
+    margin-left: auto;
+    margin-right: 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: #888;
+    white-space: nowrap;
+  }
 
   .chevron {
     font-size: 1rem;

@@ -1,4 +1,4 @@
-from typing import Dict, All
+from typing import Dict, Tuple
 
 HOMEBREW_CLASS_SCHEMA = {
     "name": str,

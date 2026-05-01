@@ -96,6 +96,28 @@ def get_all_available_classes() -> list[str]:
     return []
 
 
+def get_class_level_data(class_index: str, level: int) -> Optional[Dict[str, Any]]:
+    """
+    Fetch full level data for a class at a specific level (cached).
+
+    class_index should be the lowercase API index (e.g. 'fighter').
+    Returns the level object with keys: level, prof_bonus, features, class_specific, etc.
+    """
+    identifier = f"{class_index}_{level}"
+    return get_cached_or_fetch('class_level', identifier, f'2014/classes/{class_index}/levels/{level}')
+
+
+def get_feature_detail(feature_index: str) -> Optional[Dict[str, Any]]:
+    """
+    Fetch full details for a single class feature (including description).
+
+    Uses the local cache; fetches from API on first access.
+    The API response has a 'desc' key (list of strings) rather than 'description'.
+    Returns None if both cache and API are unavailable.
+    """
+    return get_cached_or_fetch('feature', feature_index, f'2014/features/{feature_index}')
+
+
 def get_all_available_species() -> list[str]:
     """Get list of all available species/races"""
     data = get_cached_or_fetch('index', 'races', 'races')

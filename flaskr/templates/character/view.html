@@ -64,12 +64,19 @@
     <h2>Skills</h2>
     <div class="skills-grid">
       {% for skill in skills %}
-        <div class="skill-item {% if skill.proficient %}proficient{% endif %}">
+        <div class="skill-item {% if skill.proficient %}proficient{% endif %}"
+             id="skill-{{ skill.key }}">
+          <label class="prof-checkbox-label" title="Toggle proficiency">
+            <input
+              type="checkbox"
+              class="prof-checkbox"
+              data-skill="{{ skill.key }}"
+              data-character="{{ character_id }}"
+              {% if skill.proficient %}checked{% endif %}
+            >
+          </label>
           <span class="skill-name">{{ skill.name }}</span>
-          <span class="skill-modifier">{{ skill.sign }}{{ skill.modifier }}</span>
-          {% if skill.proficient %}
-            <span class="proficiency-marker">✓</span>
-          {% endif %}
+          <span class="skill-modifier" id="mod-{{ skill.key }}">{{ skill.sign }}{{ skill.modifier }}</span>
         </div>
       {% endfor %}
     </div>
@@ -99,6 +106,32 @@
 </div>
 
 <script>
+  document.querySelectorAll('.prof-checkbox').forEach(function(checkbox) {
+    checkbox.addEventListener('change', function() {
+      const skill = this.dataset.skill;
+      const characterId = this.dataset.character;
+      const card = document.getElementById('skill-' + skill);
+      const modEl = document.getElementById('mod-' + skill);
+
+      fetch(`/character/${characterId}/skills/${skill}/toggle`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            card.classList.toggle('proficient', data.proficient);
+            modEl.textContent = data.sign + data.modifier;
+            this.checked = data.proficient;
+          } else {
+            this.checked = !this.checked;
+            alert(data.error || 'Error updating proficiency');
+          }
+        })
+        .catch(() => {
+          this.checked = !this.checked;
+          alert('Error updating proficiency');
+        });
+    });
+  });
+
   function levelUp(characterId) {
     if (confirm('Level up this character?')) {
       fetch(`/character/${characterId}/levelup`, {
@@ -283,6 +316,20 @@
     border-color: #4caf50;
   }
 
+  .prof-checkbox-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    margin-right: 0.5rem;
+  }
+
+  .prof-checkbox {
+    width: 1rem;
+    height: 1rem;
+    accent-color: #4caf50;
+    cursor: pointer;
+  }
+
   .skill-name {
     font-weight: 500;
     flex: 1;
@@ -291,12 +338,6 @@
   .skill-modifier {
     font-weight: bold;
     color: #667eea;
-    margin: 0 0.5rem;
-  }
-
-  .proficiency-marker {
-    color: #4caf50;
-    font-weight: bold;
   }
 
   .action-buttons {

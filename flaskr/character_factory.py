@@ -13,6 +13,7 @@ from flaskr.character import Character, SKILL_ABILITY_MAP
 from flaskr.data.base_classes import DndClass
 from flaskr.data.base_species import DndSpecies, ABILITY_ORDER
 from .content_registry import ContentRegistry
+from . import utils
 
 def create_character(
     name: str,
@@ -41,6 +42,7 @@ def create_character(
     # Load class and species from API/cache
     dnd_class = ContentRegistry.get_class(class_name)
     dnd_species = DndSpecies(species_name)
+    _level_data = utils._get_class_level_data(class_name, level)
     
     # Default ability scores
     if ability_scores is None:
@@ -67,10 +69,11 @@ def create_character(
         "initiative": 0,
         "speed": 30,
 
-        # features
-        "features": dnd_class.get_features_at_level(level),
+        # features — full objects {index, name, url} from the level endpoint
+        "features": _level_data.get('features', []),
+        "class_specific": _level_data.get('class_specific', {}),
         # Proficiencies
-        "proficiency_bonus": 2,
+        "proficiency_bonus": _level_data.get('prof_bonus', 2),
         "proficiencies": dnd_class.get_starting_proficiencies(),
         "proficiency_choices": dnd_class.get_proficiency_choices(),
         
@@ -258,15 +261,16 @@ def level_up(character: Character) -> Dict[str, Any]:
     character.data['max_hit_points'] += hp_gain
     character.data['hit_points'] = character.data['max_hit_points']
     
-    # Reset hit dice counter on long rest (not exactly here, but for MVP)
-    total_hit_dice = old_level  # Can use 1 per level
     character.data['hit_dice_used'] = 0
-    
+    # Update level-specific data from API
+    new_level_data = utils._get_class_level_data(character.data['class'], character.data['level'])
+    character.data['features'] = new_level_data.get('features', [])
+    character.data['class_specific'] = new_level_data.get('class_specific', {})
+    character.data['proficiency_bonus'] = new_level_data.get('prof_bonus', new_proficiency)
     return {
         'old_level': old_level,
         'new_level': character.data['level'],
         'hp_gained': hp_gain,
         'proficiency_bonus_increased': new_proficiency > old_proficiency,
         'proficiency_bonus': new_proficiency,
-        'new_features': [],  # Would fetch from class features API
     }
