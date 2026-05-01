@@ -1,9 +1,26 @@
 """ Handful of utility methods for reuse in several areas """
 
 
+import enum
+
 import requests
+from typing import Dict, List, Optional, Any
+from enum import Enum
 import werkzeug
 import flask
+
+"""
+Enum to pass to specified_api_request to specify which 
+field to generate a request for an API response.
+"""
+
+class ApiField(Enum):
+    CLASSES = "classes"
+
+
+
+
+
 
 
 """
@@ -41,4 +58,7 @@ def _extract_index(data: dict, tgt: str) -> list:
     Output: list of the dtype of the value at that index in the dict
     """
     return [item[tgt] for item in data['results']]
+
+
+def _specified_api_request(base_field: str, tgt_field: str, ) -> 
     
