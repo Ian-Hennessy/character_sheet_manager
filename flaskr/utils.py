@@ -16,6 +16,10 @@ field to generate a request for an API response.
 
 class ApiField(Enum):
     CLASSES = "classes"
+    RACES = 'races'
+    SUBCLASSES = 'classes/subclasses'
+    SUBRACES = 'races/subraces'
+    FEATURES = '/features'
 
 
 
@@ -27,19 +31,26 @@ class ApiField(Enum):
 _api_request formulates an API GET request to the dnd5e api, returning the payload from the 
 https action. 
 """
-def _api_request(field: str=""):
+def _api_request(field: ApiField, secondary_field: ApiField=None) -> Dict[str, Any]:
     """
     Generate and send a GET request for the input field to the API. 
     Input: field string to request from API 
     Output: Output of a GET request to the API for the requested field 
     """
     base_url = "https://www.dnd5eapi.co/api/2014/"
-    request_url = base_url + field
+    if secondary_field:
+        request_url = base_url + field.value + secondary_field.value
+    else:
+        request_url = base_url + field.value
     payload = {}
     headers = {
         'Accept': 'application/json'
     }
-    response = requests.request("GET", request_url, headers=headers, data=payload)
+    try:
+        response = requests.request("GET", request_url, headers=headers, data=payload)
+    except requests.RequestException as e:
+        print(f"Error fetching API data: {e}")
+        return {}
     ## Convert response to dict and return 
     response = response.json()
     return response
@@ -60,5 +71,6 @@ def _extract_index(data: dict, tgt: str) -> list:
     return [item[tgt] for item in data['results']]
 
 
-def _specified_api_request(base_field: str, tgt_field: str, ) -> 
-    
+def _specified_api_request(base_field: ApiField, tgt_field: str, ) -> list:
+    base_response = _api_request(base_field)
+    return _extract_index(base_response, tgt_field)

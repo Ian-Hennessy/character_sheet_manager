@@ -156,8 +156,8 @@ def create_step2():
         return redirect(url_for('character.create_step1'))
     
     try:
-        available_classes = utils._extract_index(utils._api_request('classes'), 'name')
-        available_species = utils._extract_index(utils._api_request('races'), 'name')
+        available_classes = utils._extract_index(utils._api_request(utils.ApiField.CLASSES), 'name')
+        available_species = utils._extract_index(utils._api_request(utils.ApiField.RACES), 'name')
     except Exception as e:
         logger.error(f"Error fetching classes/species: {e}")
         flash('Error loading class/species data. Please try again.', 'error')
