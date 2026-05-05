@@ -19,6 +19,7 @@ class ApiField(Enum):
     RACES = 'races'
     SUBCLASSES = 'classes/subclasses'
     SUBRACES = 'races/subraces'
+    MAGIC_ITEMS = 'magic-items'
 
 
 def _normalize_class_index(class_name: str) -> str:

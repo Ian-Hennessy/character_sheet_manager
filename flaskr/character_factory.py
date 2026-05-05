@@ -191,12 +191,12 @@ def _initialize_saving_throws(ability_scores: List[int]) -> Dict[str, tuple]:
 def _get_spell_slots_for_level(level_data: Dict[str, Any]) -> List[int]:
     """
     Extract spell slots as a list of 10 ints from API level data.
-    Index 0 is unused; indices 1-9 correspond to spell levels 1-9.
+    Index 0 is for cantrips indices 1-9 correspond to spell levels 1-9.
     Returns all zeros for non-spellcasting classes.
     """
     sc = level_data.get('spellcasting', {})
     return [
-        0,
+        sc.get('cantrips_known', 0),
         sc.get('spell_slots_level_1', 0),
         sc.get('spell_slots_level_2', 0),
         sc.get('spell_slots_level_3', 0),

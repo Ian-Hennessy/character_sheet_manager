@@ -18,6 +18,7 @@ from flaskr.db import get_db
 from flaskr.character_factory import create_character
 from flaskr.data.base_classes import DndClass
 from flaskr.data.base_species import DndSpecies
+from flaskr.character_factory import _get_spell_slots_for_level
 from flaskr.data.api_utils import get_feature_detail, get_class_level_data, get_class_spells, get_spell_detail
 from flaskr.character import Character
 
@@ -455,7 +456,7 @@ def level_up(character_id):
         # Update spell slots from the new level's spellcasting data and reset used slots
         sc = level_data.get('spellcasting', {})
         data['spell_slots'] = [
-            0,
+            sc.get('cantrips_known', 0),
             sc.get('spell_slots_level_1', 0),
             sc.get('spell_slots_level_2', 0),
             sc.get('spell_slots_level_3', 0),
@@ -728,11 +729,14 @@ def list_spells(character_id):
     # Fetch class spell list for the browser
     class_index = data.get('class', '').lower().replace(' ', '-')
     class_spell_list = []
+    slot_levels_with_slots = [i for i in range(10) if spell_slots[i] > 0]
+    max_slot_level = max(slot_levels_with_slots) if slot_levels_with_slots else -1
     for s in get_class_spells(class_index):
         if s['index'] not in known_indices:
             # only include spells at or below character's maximum slot level
-            if s['level'] <= max(i for i in range(10) if spell_slots[i] > 0):
+            if s['level'] <= max_slot_level:
                 class_spell_list.append({'index': s['index'], 'name': s['name']})
+
 
     # Build slot rows — only include levels that have at least one slot
     slot_levels = [
@@ -740,6 +744,7 @@ def list_spells(character_id):
         for i in range(1, 10)
         if spell_slots[i] > 0
     ]
+
 
     return render_template(
         'character/spells.html',
@@ -750,6 +755,10 @@ def list_spells(character_id):
         known_spells=known_spells,
         class_spell_list=class_spell_list,
     )
+
+
+
+     
 
 
 @bp.route('/<int:character_id>/spells/slot/use/<int:slot_level>', methods=['POST'])
@@ -833,6 +842,7 @@ def reset_spell_slots(character_id):
 def add_spell(character_id):
     """Add a spell to the character's known spells."""
     spell_index = request.form.get('spell_index', '').strip()
+
     if not spell_index:
         return jsonify({'error': 'Missing spell index'}), 400
 
@@ -843,17 +853,54 @@ def add_spell(character_id):
         known = data.get('known_spells', [])
         if spell_index in known:
             return jsonify({'error': 'Spell already known'}), 400
-        known.append(spell_index)
+        detail = get_spell_detail(spell_index)
+        # Always use fresh spell slots from API so cantrips_known is accurate even for
+        # characters created before index-0 was wired to cantrips_known.
+        level_data = utils._get_class_level_data(data.get('class', ''), data.get('level', 1))
+        fresh_slots = _get_spell_slots_for_level(level_data)
+        # Repair stale stored value in-place so future operations are also correct.
+        slots = data.get('spell_slots', [0] * 10)
+        if isinstance(slots, list) and slots[0] == 0 and fresh_slots[0] > 0:
+            slots[0] = fresh_slots[0]
+            data['spell_slots'] = slots
+        valid_add = _validate_spell_list(data.get('known_spells'), fresh_slots, detail.get('level', spell_index))
+        if not valid_add:
+            return jsonify({'error': f"You can't learn any more spells of level {detail.get('level', spell_index)}"}), 400
+        insert_ind = locate_insertion_point(detail.get('level', spell_index), known)
+        known.insert(insert_ind, spell_index)
         data['known_spells'] = known
         db.execute('UPDATE characters SET data = ?, updated = CURRENT_TIMESTAMP WHERE id = ?',
                    (json.dumps(data), character_id))
         db.commit()
-        detail = get_spell_detail(spell_index)
+
         spell_name = detail.get('name', spell_index) if detail else spell_index
         return jsonify({'success': True, 'spell': spell_name})
     except (json.JSONDecodeError, KeyError) as e:
         logger.error(f"Error adding spell: {e}")
         return jsonify({'error': 'Server error'}), 500
+
+def _validate_spell_list(char_known_spells: list, spell_slots_by_level: list, spell_level: int) -> bool:
+    # check that char is not at max spells for this level:
+    c = 0
+    for ind in char_known_spells:
+        spell_detail = get_spell_detail(ind)
+        lvl = spell_detail.get('level', ind)
+        if lvl == spell_level:
+            c += 1
+    if c >= spell_slots_by_level[spell_level]:
+        return False
+
+    return True
+
+def locate_insertion_point(spell_lvl: int, spell_list: list) -> int: 
+    for i in range(0, len(spell_list)): 
+        spell = spell_list[i]
+        detail = get_spell_detail(spell)
+        lvl = detail.get('level', spell)
+        if spell_lvl <= lvl:
+            return i
+    return len(spell_list)
+
 
 
 @bp.route('/<int:character_id>/spells/remove/<spell_index>', methods=['POST'])
