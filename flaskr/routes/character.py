@@ -274,7 +274,7 @@ def create_step3():
                 class_name=char_data['class'],
                 species_name=char_data['species'],
                 ability_scores=ability_scores,
-                level=char_data.get('level', 1),
+                level=char_data.get('level'),
             )
 
             db.execute(

@@ -8,6 +8,8 @@ Handles:
 4. Default equipment and skill initialization
 """
 
+import numpy as np 
+from numpy import random as r
 from typing import Dict, Any, List, Optional
 from flaskr.character import Character, SKILL_ABILITY_MAP
 from flaskr.data.base_classes import DndClass
@@ -120,13 +122,22 @@ def create_character(
         "version": "5e",
         "created_at": None,  # Set by database
     }
-    
     # Apply species modifiers (ability scores, speed, languages)
     character_data = dnd_species.apply_to_character(character_data)
     
     # Recalculate after species modifiers
     character_data["modifiers"] = _calculate_modifiers(character_data["ability_scores"])
-    character_data["max_hit_points"] = dnd_class.hit_die + character_data["modifiers"][2]  # HD + CON
+    con_mod = character_data["modifiers"][2]
+    if level == 1:
+        character_data["max_hit_points"] = dnd_class.hit_die + con_mod
+    else:
+        # Apply the per-level CON delta (delta applies once per level)
+        delta = level - 1
+        hp = dnd_class.hit_die + con_mod
+        for i in range(delta):
+            hp += r.randint(1, dnd_class.hit_die) + con_mod
+        character_data["max_hit_points"] = hp
+
     character_data["hit_points"] = character_data["max_hit_points"]
     
     # Recalculate skills and saves with updated modifiers

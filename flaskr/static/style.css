@@ -124,6 +124,12 @@ nav ul li a, nav ul li span, header .action {
   resize: vertical;
 }
 
+.stat-label {
+  font-size: 0.65em;
+  opacity: 0.6;
+  letter-spacing:0.05em;
+}
+
 input.danger {
   color: #cc2f2e;
 }

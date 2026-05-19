@@ -53,11 +53,13 @@
         <div class="ability-card">
           <div class="ability-name">{{ ability.name }}</div>
           <div class="ability-score">{{ ability.score }}</div>
-          <div class="ability-modifier">{{ ability.sign }}{{ ability.modifier }}</div>
+          <div class="ability-modifier"><span class="stat-label">MOD </span>{{ ability.sign }}{{ ability.modifier }}</div>
+          <div class="save-modifier"><span class="stat-label">SAVE </span>{{ saving_throws[loop.index0].sign }}{{ saving_throws[loop.index0].modifier }}</div>
         </div>
       {% endfor %}
     </div>
   </div>
+
 
   <!-- Skills -->
   <div class="skills-section">
