@@ -15,17 +15,50 @@
 {% endblock %}
 
 {% block content %}
-<div class="character-sheet-container">
+<div class="character-sheet-container" id="character-data" data-id="{{ character_id }}">
   <!-- Main Stats -->
   <div class="stats-section">
     <div class="stat-card hp-card">
       <h3>Hit Points</h3>
       <div class="hp-display">
-        <div class="hp-value">{{ character.hit_points }}</div>
-        <div class="hp-max">/ {{ character.max_hit_points }}</div>
+        <div class="hp-value" id="hp-current">{{ character.hit_points }}</div>
+        <div class="hp-max">/ <span id="hp-max">{{ character.max_hit_points }}</span></div>
       </div>
       <div class="hp-bar">
-        <span class="hp-fill" style="width: {{ (character.hit_points / character.max_hit_points * 100 if character.max_hit_points > 0 else 0)|int }}"></span>
+        <span class="hp-fill" id="hp-fill" style="width: {{ (character.hit_points / character.max_hit_points * 100 if character.max_hit_points > 0 else 0)|int }}%"></span>
+      </div>
+      <button class="btn btn-secondary hp-toggle-btn" onclick="toggleHpPanel()" id="hp-toggle-btn">Damage / Heal</button>
+      <div class="hp-panel" id="hp-panel" style="display:none;">
+        <input type="number" id="hp-amount" class="hp-amount-input" min="1" placeholder="Amount" />
+        <div class="hp-panel-buttons">
+          <button class="btn btn-danger" onclick="applyHp('damage')">Damage</button>
+          <button class="btn btn-heal" onclick="applyHp('heal')">Heal</button>
+        </div>
+      </div>
+      <div class="death-saves-section" id="death-saves-section" style="display:none;" data-show="{{ '1' if character.hit_points == 0 else '0' }}">
+        <div class="death-saves-header">&#9760; Death Saving Throws</div>
+        <p class="death-saves-hint">Roll d20 at turn start &mdash; 10+ is a success</p>
+        <div class="death-saves-rows">
+          <div class="death-saves-row">
+            <span class="ds-label success-label">Successes</span>
+            <div class="ds-pips" id="ds-successes">
+              {% for i in range(3) %}
+                <span class="ds-pip success-pip {% if character.death_saves is defined and character.death_saves.successes[i] %}filled{% endif %}"
+                      data-type="successes" data-index="{{ i }}"></span>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="death-saves-row">
+            <span class="ds-label failure-label">Failures</span>
+            <div class="ds-pips" id="ds-failures">
+              {% for i in range(3) %}
+                <span class="ds-pip failure-pip {% if character.death_saves is defined and character.death_saves.failures[i] %}filled{% endif %}"
+                      data-type="failures" data-index="{{ i }}"></span>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        <div class="death-saves-outcome" id="death-saves-outcome"></div>
       </div>
     </div>
 
@@ -111,6 +144,7 @@
   </div>
 </div>
 
+
 <script>
   document.querySelectorAll('.prof-checkbox').forEach(function(checkbox) {
     checkbox.addEventListener('change', function() {
@@ -135,6 +169,95 @@
           this.checked = !this.checked;
           alert('Error updating proficiency');
         });
+    });
+  });
+
+  const CHARACTER_ID = document.getElementById('character-data').dataset.id;
+
+  function toggleHpPanel() {
+    const panel = document.getElementById('hp-panel');
+    const open = panel.style.display === 'none';
+    panel.style.display = open ? 'block' : 'none';
+    if (open) document.getElementById('hp-amount').focus();
+  }
+
+  document.getElementById('hp-amount').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') applyHp('damage');
+  });
+
+  function applyHp(action) {
+    const amount = parseInt(document.getElementById('hp-amount').value);
+    if (!amount || amount <= 0) return;
+    fetch(`/character/${CHARACTER_ID}/hp/update`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({action, amount})
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (!data.success) { alert(data.error || 'Error'); return; }
+      const maxHp = data.max_hp;
+      document.getElementById('hp-current').textContent = data.hp;
+      document.getElementById('hp-max').textContent = maxHp;
+      const pct = maxHp > 0 ? Math.round(data.hp / maxHp * 100) : 0;
+      const fill = document.getElementById('hp-fill');
+      fill.style.width = pct + '%';
+      fill.style.background = pct <= 25
+        ? 'linear-gradient(90deg, #f44336, #e57373)'
+        : pct <= 50
+          ? 'linear-gradient(90deg, #ff9800, #ffb74d)'
+          : 'linear-gradient(90deg, #4caf50, #8bc34a)';
+      document.getElementById('hp-amount').value = '';
+      document.getElementById('hp-panel').style.display = 'none';
+      if (data.hp === 0) showDeathSaves();
+      else hideDeathSaves();
+    })
+    .catch(() => alert('Error updating HP'));
+  }
+
+  function showDeathSaves() {
+    document.getElementById('death-saves-section').style.display = 'block';
+  }
+
+  function hideDeathSaves() {
+    document.getElementById('death-saves-section').style.display = 'none';
+  }
+
+  // Show on load if already at 0 HP
+  if (document.getElementById('death-saves-section').dataset.show === '1') {
+    showDeathSaves();
+  }
+
+  document.querySelectorAll('.ds-pip').forEach(function(pip) {
+    pip.addEventListener('click', function() {
+      const saveType = this.dataset.type;
+      const index = parseInt(this.dataset.index);
+      const checked = !this.classList.contains('filled');
+      fetch(`/character/${CHARACTER_ID}/death-saves/update`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type: saveType, index, checked})
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (!data.success) return;
+        this.classList.toggle('filled', checked);
+        const saves = data.death_saves;
+        const successes = saves.successes.filter(Boolean).length;
+        const failures = saves.failures.filter(Boolean).length;
+        const outcome = document.getElementById('death-saves-outcome');
+        if (failures >= 3) {
+          outcome.textContent = 'Character has died.';
+          outcome.className = 'death-saves-outcome outcome-dead';
+        } else if (successes >= 3) {
+          outcome.textContent = 'Stabilized!';
+          outcome.className = 'death-saves-outcome outcome-stable';
+        } else {
+          outcome.textContent = '';
+          outcome.className = 'death-saves-outcome';
+        }
+      })
+      .catch(() => {});
     });
   });
 
@@ -395,5 +518,134 @@
   .btn-danger:hover {
     background: #ff5252;
   }
+
+  .btn-heal {
+    background: #4caf50;
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    font-weight: 500;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.2s;
+  }
+
+  .btn-heal:hover {
+    background: #388e3c;
+  }
+
+  .hp-toggle-btn {
+    margin-top: 1rem;
+    width: 100%;
+  }
+
+  .hp-panel {
+    margin-top: 0.75rem;
+  }
+
+  .hp-amount-input {
+    width: 100%;
+    padding: 0.5rem;
+    font-size: 1.2rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    box-sizing: border-box;
+    text-align: center;
+  }
+
+  .hp-panel-buttons {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .hp-panel-buttons .btn,
+  .hp-panel-buttons .btn-heal {
+    flex: 1;
+  }
+
+  /* Death saves inline section */
+  .death-saves-section {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e0e0e0;
+  }
+
+  .death-saves-header {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #c0392b;
+    margin-bottom: 0.2rem;
+  }
+
+  .death-saves-hint {
+    font-size: 0.72rem;
+    color: #999;
+    margin: 0 0 0.6rem 0;
+  }
+
+  .death-saves-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .death-saves-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .ds-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    width: 4.5rem;
+    flex-shrink: 0;
+  }
+
+  .success-label { color: #4caf50; }
+  .failure-label { color: #e53935; }
+
+  .ds-pips {
+    display: flex;
+    gap: 6px;
+  }
+
+  .ds-pip {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid #ccc;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .success-pip.filled {
+    background: #4caf50;
+    border-color: #388e3c;
+  }
+
+  .failure-pip.filled {
+    background: #e53935;
+    border-color: #b71c1c;
+  }
+
+  .ds-pip:hover {
+    opacity: 0.75;
+  }
+
+  .death-saves-outcome {
+    margin-top: 0.5rem;
+    min-height: 1.2rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+
+  .outcome-stable { color: #4caf50; }
+  .outcome-dead   { color: #e53935; }
 </style>
 {% endblock %}

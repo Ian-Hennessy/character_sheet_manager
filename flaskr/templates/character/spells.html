@@ -231,7 +231,7 @@
             <span class="browser-item-name">{{ spell.name }}</span>
             <button
               class="btn btn-success btn-sm"
-              onclick="addSpell({{ character_id }}, {{ spell.index | tojson }}, {{ spell.name | tojson }}, this)"
+              onclick='addSpell({{ character_id }}, "{{ spell.index }}", "{{ spell.name | replace('"', '\\"') }}", this)'
             >Add</button>
           </div>
         {% endfor %}

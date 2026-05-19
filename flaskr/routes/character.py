@@ -497,6 +497,82 @@ def level_up(character_id):
         return jsonify({'error': 'Error leveling up character'}), 500
 
 
+# HP & DEATH SAVES
+
+@bp.route('/<int:character_id>/hp/update', methods=['POST'])
+@login_required
+@character_owner_required
+def update_hp(character_id):
+    """Apply damage or healing to a character."""
+    db = get_db()
+    char = db.execute('SELECT data FROM characters WHERE id = ?', (character_id,)).fetchone()
+    try:
+        data = json.loads(char['data'])
+        body = request.get_json()
+        action = body.get('action')  # 'damage' or 'heal'
+        amount = int(body.get('amount', 0))
+        if amount <= 0:
+            return jsonify({'error': 'Amount must be positive'}), 400
+
+        max_hp = data.get('max_hit_points', 0)
+        current_hp = data.get('hit_points', 0)
+
+        if action == 'damage':
+            new_hp = max(0, current_hp - amount)
+        elif action == 'heal':
+            new_hp = min(max_hp, current_hp + amount)
+        else:
+            return jsonify({'error': 'Invalid action'}), 400
+
+        data['hit_points'] = new_hp
+        # Reset death saves when healed above 0
+        if new_hp > 0:
+            data['death_saves'] = {'successes': [False, False, False], 'failures': [False, False, False]}
+
+        db.execute(
+            'UPDATE characters SET data = ?, updated = CURRENT_TIMESTAMP WHERE id = ?',
+            (json.dumps(data), character_id)
+        )
+        db.commit()
+        return jsonify({'success': True, 'hp': new_hp, 'max_hp': max_hp})
+    except (json.JSONDecodeError, KeyError, ValueError) as e:
+        logger.error(f"Error updating HP for character {character_id}: {e}")
+        return jsonify({'error': 'Error updating hit points'}), 500
+
+
+@bp.route('/<int:character_id>/death-saves/update', methods=['POST'])
+@login_required
+@character_owner_required
+def update_death_saves(character_id):
+    """Toggle a death saving throw box."""
+    db = get_db()
+    char = db.execute('SELECT data FROM characters WHERE id = ?', (character_id,)).fetchone()
+    try:
+        data = json.loads(char['data'])
+        body = request.get_json()
+        save_type = body.get('type')   # 'successes' or 'failures'
+        index = int(body.get('index'))  # 0, 1, or 2
+        checked = bool(body.get('checked'))
+
+        if save_type not in ('successes', 'failures') or index not in (0, 1, 2):
+            return jsonify({'error': 'Invalid parameters'}), 400
+
+        if 'death_saves' not in data:
+            data['death_saves'] = {'successes': [False, False, False], 'failures': [False, False, False]}
+
+        data['death_saves'][save_type][index] = checked
+
+        db.execute(
+            'UPDATE characters SET data = ?, updated = CURRENT_TIMESTAMP WHERE id = ?',
+            (json.dumps(data), character_id)
+        )
+        db.commit()
+        return jsonify({'success': True, 'death_saves': data['death_saves']})
+    except (json.JSONDecodeError, KeyError, ValueError) as e:
+        logger.error(f"Error updating death saves for character {character_id}: {e}")
+        return jsonify({'error': 'Error updating death saves'}), 500
+
+
 # INVENTORY MANAGEMENT
 
 @bp.route('/<int:character_id>/inventory/add', methods=['POST'])
